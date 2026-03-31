@@ -1,0 +1,49 @@
+namespace DotnetApiTemplate.Domain.Enums;
+
+/// <summary>
+/// Error codes for client-side error handling and translation
+/// Format: CATEGORY_SPECIFIC_ERROR
+/// </summary>
+public enum ErrorCode
+{
+    // General Errors (1000-1999)
+    UNKNOWN_ERROR = 1000,
+    INTERNAL_SERVER_ERROR = 1001,
+    BAD_REQUEST = 1002,
+    UNAUTHORIZED = 1003,
+    FORBIDDEN = 1004,
+    SERVICE_UNAVAILABLE = 1005,
+
+    // Resource Errors (2000-2999)
+    RESOURCE_NOT_FOUND = 2000,
+    RESOURCE_ALREADY_EXISTS = 2001,
+    RESOURCE_DELETED = 2002,
+
+    // Validation Errors (3000-3999)
+    VALIDATION_ERROR = 3000,
+    REQUIRED_FIELD_MISSING = 3001,
+    INVALID_FIELD_FORMAT = 3002,
+    INVALID_FIELD_LENGTH = 3003,
+    INVALID_FIELD_RANGE = 3004,
+
+    // Car Specific Errors (4000-4999)
+    CAR_NOT_FOUND = 4000,
+    CAR_ALREADY_EXISTS = 4001,
+    CAR_NOT_AVAILABLE = 4002,
+    INVALID_VIN = 4003,
+    INVALID_YEAR = 4004,
+    INVALID_PRICE = 4005,
+    INVALID_MILEAGE = 4006,
+
+    // Database Errors (5000-5999)
+    DATABASE_ERROR = 5000,
+    DATABASE_CONNECTION_FAILED = 5001,
+    DUPLICATE_ENTRY = 5002,
+    CONSTRAINT_VIOLATION = 5003,
+
+    // Authentication/Authorization Errors (6000-6999)
+    INVALID_CREDENTIALS = 6000,
+    TOKEN_EXPIRED = 6001,
+    TOKEN_INVALID = 6002,
+    INSUFFICIENT_PERMISSIONS = 6003
+}
