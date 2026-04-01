@@ -50,8 +50,9 @@ Database migrations run automatically on startup.
 ### Option 1: dotnet new (recommended)
 
 ```bash
-# Install the template
-dotnet new install ./DotnetApiTemplate
+# Clone and install the template
+git clone https://github.com/Serotops/dotnet-api-template.git
+dotnet new install ./dotnet-api-template
 
 # Create a new project
 dotnet new dotnet-api -n MyProject -o ./MyProject
