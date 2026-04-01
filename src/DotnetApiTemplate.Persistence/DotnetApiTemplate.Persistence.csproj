@@ -16,10 +16,4 @@
     <ProjectReference Include="..\DotnetApiTemplate.Domain\DotnetApiTemplate.Domain.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Configurations\" />
-    <Folder Include="Migrations\" />
-    <Folder Include="Repositories\" />
-  </ItemGroup>
-
 </Project>

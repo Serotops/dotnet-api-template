@@ -9,7 +9,6 @@ A clean architecture ASP.NET Core API template. Clone it, rename it, and start b
 - **Serilog** for structured logging
 - **FluentValidation** for request validation
 - **FluentResults** for the Result pattern
-- **AutoMapper** for DTO mapping
 - **Swagger / OpenAPI** with API versioning
 - **xUnit** with FluentAssertions for testing
 - **Docker** for containerization

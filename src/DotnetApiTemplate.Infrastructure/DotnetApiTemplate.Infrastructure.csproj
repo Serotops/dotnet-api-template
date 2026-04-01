@@ -15,9 +15,4 @@
     <ProjectReference Include="..\DotnetApiTemplate.Domain\DotnetApiTemplate.Domain.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Authentication\" />
-    <Folder Include="Interfaces\" />
-  </ItemGroup>
-
 </Project>

@@ -5,7 +5,6 @@ using DotnetApiTemplate.Application.Interfaces.Repositories;
 using DotnetApiTemplate.Application.Services;
 using DotnetApiTemplate.Domain.Entities;
 using DotnetApiTemplate.Domain.Enums;
-using AutoMapper;
 using FluentAssertions;
 using FluentResults;
 using Moq;
@@ -16,14 +15,12 @@ namespace DotnetApiTemplate.UnitTests.Application.Services;
 public class CarServiceTests
 {
     private readonly Mock<ICarRepository> _mockRepository;
-    private readonly Mock<IMapper> _mockMapper;
     private readonly CarService _carService;
 
     public CarServiceTests()
     {
         _mockRepository = new Mock<ICarRepository>();
-        _mockMapper = new Mock<IMapper>();
-        _carService = new CarService(_mockRepository.Object, _mockMapper.Object);
+        _carService = new CarService(_mockRepository.Object);
     }
 
     #region GetByIdAsync Tests
@@ -43,30 +40,19 @@ public class CarServiceTests
             Price = 22000,
             Mileage = 62000
         };
-        var carDto = new CarDto
-        {
-            Id = carId,
-            Make = "Renault",
-            Model = "Clio",
-            Year = 2020,
-            Color = "Black",
-            Price = 22000,
-            Mileage = 62000
-        };
 
         _mockRepository.Setup(x => x.GetByIdAsync(carId))
             .ReturnsAsync(car);
-        _mockMapper.Setup(x => x.Map<CarDto>(car))
-            .Returns(carDto);
 
         // Act
         var result = await _carService.GetByIdAsync(carId);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeEquivalentTo(carDto);
+        result.Value.Id.Should().Be(carId);
+        result.Value.Make.Should().Be("Renault");
+        result.Value.Model.Should().Be("Clio");
         _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-        _mockMapper.Verify(x => x.Map<CarDto>(car), Times.Once);
     }
 
     [Fact]
@@ -87,7 +73,6 @@ public class CarServiceTests
         var error = result.Errors[0] as NotFoundError;
         error!.ErrorCode.Should().Be(ErrorCode.CAR_NOT_FOUND);
         _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-        _mockMapper.Verify(x => x.Map<CarDto>(It.IsAny<Car>()), Times.Never);
     }
 
     #endregion
@@ -122,57 +107,26 @@ public class CarServiceTests
             }
         };
 
-        var carDtos = new List<CarDto>
-        {
-            new CarDto
-            {
-                Id = cars[0].Id,
-                Make = "Renault",
-                Model = "Clio",
-                Year = 2020,
-                Color = "Black",
-                Price = 22000,
-                Mileage = 62000
-            },
-            new CarDto
-            {
-                Id = cars[1].Id,
-                Make = "Toyota",
-                Model = "Corolla",
-                Year = 2021,
-                Color = "White",
-                Price = 25000,
-                Mileage = 30000
-            }
-        };
-
         _mockRepository.Setup(x => x.GetAllAsync())
             .ReturnsAsync(cars);
-        _mockMapper.Setup(x => x.Map<IEnumerable<CarDto>>(cars))
-            .Returns(carDtos);
 
         // Act
         var result = await _carService.GetAllAsync();
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().BeEquivalentTo(carDtos);
         result.Value.Should().HaveCount(2);
+        result.Value.First().Make.Should().Be("Renault");
+        result.Value.Last().Make.Should().Be("Toyota");
         _mockRepository.Verify(x => x.GetAllAsync(), Times.Once);
-        _mockMapper.Verify(x => x.Map<IEnumerable<CarDto>>(cars), Times.Once);
     }
 
     [Fact]
     public async Task GetAllAsync_Should_Return_Empty_List_When_No_Cars()
     {
         // Arrange
-        var cars = new List<Car>();
-        var carDtos = new List<CarDto>();
-
         _mockRepository.Setup(x => x.GetAllAsync())
-            .ReturnsAsync(cars);
-        _mockMapper.Setup(x => x.Map<IEnumerable<CarDto>>(cars))
-            .Returns(carDtos);
+            .ReturnsAsync(new List<Car>());
 
         // Act
         var result = await _carService.GetAllAsync();
@@ -219,24 +173,8 @@ public class CarServiceTests
             Data = cars
         };
 
-        var carDtos = new List<CarDto>
-        {
-            new CarDto
-            {
-                Id = cars[0].Id,
-                Make = "Renault",
-                Model = "Clio",
-                Year = 2020,
-                Color = "Black",
-                Price = 22000,
-                Mileage = 62000
-            }
-        };
-
         _mockRepository.Setup(x => x.GetFilteredAsync(filterParams))
             .ReturnsAsync(paginationResult);
-        _mockMapper.Setup(x => x.Map<List<CarDto>>(cars))
-            .Returns(carDtos);
 
         // Act
         var result = await _carService.GetFilteredAsync(filterParams);
@@ -246,9 +184,9 @@ public class CarServiceTests
         result.Value.PageIndex.Should().Be(1);
         result.Value.PageSize.Should().Be(10);
         result.Value.TotalItems.Should().Be(1);
-        result.Value.Data.Should().BeEquivalentTo(carDtos);
+        result.Value.Data.Should().HaveCount(1);
+        result.Value.Data[0].Make.Should().Be("Renault");
         _mockRepository.Verify(x => x.GetFilteredAsync(filterParams), Times.Once);
-        _mockMapper.Verify(x => x.Map<List<CarDto>>(cars), Times.Once);
     }
 
     #endregion
@@ -269,40 +207,23 @@ public class CarServiceTests
             Mileage = 62000
         };
 
-        var car = new Car
-        {
-            Make = "Renault",
-            Model = "Clio",
-            Year = 2020,
-            Color = "Black",
-            Price = 22000,
-            Mileage = 62000
-        };
+        var createdCarId = Guid.NewGuid();
 
-        var createdCar = new Car
-        {
-            Id = Guid.NewGuid(),
-            Make = "Renault",
-            Model = "Clio",
-            Year = 2020,
-            Color = "Black",
-            Price = 22000,
-            Mileage = 62000
-        };
-
-        _mockMapper.Setup(x => x.Map<Car>(carDto))
-            .Returns(car);
-        _mockRepository.Setup(x => x.AddAsync(car))
-            .ReturnsAsync(createdCar);
+        _mockRepository.Setup(x => x.AddAsync(It.IsAny<Car>()))
+            .ReturnsAsync((Car c) =>
+            {
+                c.Id = createdCarId;
+                return c;
+            });
 
         // Act
         var result = await _carService.AddAsync(carDto);
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        result.Value.Should().Be(createdCar.Id);
-        _mockMapper.Verify(x => x.Map<Car>(carDto), Times.Once);
-        _mockRepository.Verify(x => x.AddAsync(car), Times.Once);
+        result.Value.Should().Be(createdCarId);
+        _mockRepository.Verify(x => x.AddAsync(It.Is<Car>(c =>
+            c.Make == "Renault" && c.Model == "Clio" && c.Year == 2020)), Times.Once);
     }
 
     #endregion
@@ -332,13 +253,11 @@ public class CarServiceTests
             Year = 2020,
             Color = "Red",
             Price = 21000,
-            Mileage = 65000 // Increased mileage - valid
+            Mileage = 65000
         };
 
         _mockRepository.Setup(x => x.GetByIdAsync(carId))
             .ReturnsAsync(existingCar);
-        _mockMapper.Setup(x => x.Map(updateDto, existingCar))
-            .Returns(existingCar);
         _mockRepository.Setup(x => x.UpdateAsync(existingCar))
             .Returns(Task.CompletedTask);
 
@@ -347,8 +266,10 @@ public class CarServiceTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
+        existingCar.Color.Should().Be("Red");
+        existingCar.Price.Should().Be(21000);
+        existingCar.Mileage.Should().Be(65000);
         _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-        _mockMapper.Verify(x => x.Map(updateDto, existingCar), Times.Once);
         _mockRepository.Verify(x => x.UpdateAsync(existingCar), Times.Once);
     }
 
@@ -406,7 +327,7 @@ public class CarServiceTests
             Year = 2020,
             Color = "Black",
             Price = 22000,
-            Mileage = 50000 // Decreased mileage - invalid
+            Mileage = 50000
         };
 
         _mockRepository.Setup(x => x.GetByIdAsync(carId))
@@ -451,13 +372,11 @@ public class CarServiceTests
             Year = 2020,
             Color = "Black",
             Price = 22000,
-            Mileage = 62000 // Same mileage - valid
+            Mileage = 62000
         };
 
         _mockRepository.Setup(x => x.GetByIdAsync(carId))
             .ReturnsAsync(existingCar);
-        _mockMapper.Setup(x => x.Map(updateDto, existingCar))
-            .Returns(existingCar);
         _mockRepository.Setup(x => x.UpdateAsync(existingCar))
             .Returns(Task.CompletedTask);
 
@@ -494,7 +413,6 @@ public class CarServiceTests
         {
             Price = 21000,
             IsAvailable = false
-            // Other fields are null - should not be updated
         };
 
         _mockRepository.Setup(x => x.GetByIdAsync(carId))
@@ -509,9 +427,9 @@ public class CarServiceTests
         result.IsSuccess.Should().BeTrue();
         existingCar.Price.Should().Be(21000);
         existingCar.IsAvailable.Should().BeFalse();
-        existingCar.Make.Should().Be("Renault"); // Should not change
-        existingCar.Model.Should().Be("Clio"); // Should not change
-        existingCar.Mileage.Should().Be(62000); // Should not change
+        existingCar.Make.Should().Be("Renault");
+        existingCar.Model.Should().Be("Clio");
+        existingCar.Mileage.Should().Be(62000);
         _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
         _mockRepository.Verify(x => x.UpdateAsync(existingCar), Times.Once);
     }
@@ -560,7 +478,7 @@ public class CarServiceTests
 
         var patchDto = new CarPatchDto
         {
-            Mileage = 50000 // Decreased mileage - invalid
+            Mileage = 50000
         };
 
         _mockRepository.Setup(x => x.GetByIdAsync(carId))
@@ -650,7 +568,7 @@ public class CarServiceTests
         var patchDto = new CarPatchDto
         {
             Price = 21000,
-            Mileage = null // Null - should not validate or update
+            Mileage = null
         };
 
         _mockRepository.Setup(x => x.GetByIdAsync(carId))
@@ -663,8 +581,8 @@ public class CarServiceTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        existingCar.Mileage.Should().Be(62000); // Should remain unchanged
-        existingCar.Price.Should().Be(21000); // Should be updated
+        existingCar.Mileage.Should().Be(62000);
+        existingCar.Price.Should().Be(21000);
         _mockRepository.Verify(x => x.UpdateAsync(existingCar), Times.Once);
     }
 
@@ -778,7 +696,7 @@ public class CarServiceTests
         result.Value.Should().EndWith(".txt");
         _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
 
-        // Clean up - delete the generated report file if it exists
+        // Clean up
         if (File.Exists(result.Value))
         {
             File.Delete(result.Value);

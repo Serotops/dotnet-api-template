@@ -2,7 +2,6 @@
 using DotnetApiTemplate.API.Services;
 using DotnetApiTemplate.Application.Interfaces.Repositories;
 using DotnetApiTemplate.Application.Interfaces.Services;
-using DotnetApiTemplate.Application.MappingProfiles;
 using DotnetApiTemplate.Application.Services;
 using DotnetApiTemplate.Application.Validators;
 using DotnetApiTemplate.Persistence;
@@ -129,8 +128,6 @@ public static class ApplicationServicesExtensions
         services.AddScoped<ICarRepository, CarRepository>();
 
         services.AddScoped<ICarService, CarService>();
-
-        services.AddAutoMapper(cfg => cfg.AddProfile<MappingProfile>());
 
         // Register FluentValidation validators
         // Note: We DON'T use AddFluentValidationAutoValidation() here because we handle

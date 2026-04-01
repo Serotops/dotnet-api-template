@@ -7,22 +7,12 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="AutoMapper" Version="13.0.1" />
     <PackageReference Include="FluentValidation" Version="12.1.1" />
     <PackageReference Include="FluentResults" Version="3.16.0" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\DotnetApiTemplate.Domain\DotnetApiTemplate.Domain.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Common\" />
-    <Folder Include="DTOs\" />
-    <Folder Include="Interfaces\" />
-    <Folder Include="MappingProfiles\" />
-    <Folder Include="Validators\" />
-    <Folder Include="Services\" />
   </ItemGroup>
 
 </Project>

@@ -1,3 +1,5 @@
+using DotnetApiTemplate.Domain.Entities;
+
 namespace DotnetApiTemplate.Application.DTOs;
 
 public class CarDto
@@ -13,4 +15,19 @@ public class CarDto
     public bool IsAvailable { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? ModifiedAt { get; set; }
+
+    public static CarDto FromEntity(Car car) => new()
+    {
+        Id = car.Id,
+        Make = car.Make,
+        Model = car.Model,
+        Year = car.Year,
+        Color = car.Color,
+        Price = car.Price,
+        VIN = car.VIN,
+        Mileage = car.Mileage,
+        IsAvailable = car.IsAvailable,
+        CreatedAt = car.CreatedAt,
+        ModifiedAt = car.ModifiedAt
+    };
 }

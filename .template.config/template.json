@@ -10,7 +10,7 @@
   "identity": "DotnetApiTemplate.CleanArchitecture",
   "name": "Clean Architecture API Template",
   "shortName": "dotnet-api",
-  "description": "A clean architecture ASP.NET Core API template with EF Core, FluentValidation, AutoMapper, Serilog, Docker, and more.",
+  "description": "A clean architecture ASP.NET Core API template with EF Core, FluentValidation, Serilog, Docker, and more.",
   "tags": {
     "language": "C#",
     "type": "solution"
