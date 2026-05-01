@@ -6,7 +6,6 @@ using DotnetApiTemplate.Application.Services;
 using DotnetApiTemplate.Domain.Entities;
 using DotnetApiTemplate.Domain.Enums;
 using FluentAssertions;
-using FluentResults;
 using Moq;
 using Xunit;
 
@@ -41,7 +40,7 @@ public class CarServiceTests
             Mileage = 62000
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(car);
 
         // Act
@@ -52,7 +51,7 @@ public class CarServiceTests
         result.Value.Id.Should().Be(carId);
         result.Value.Make.Should().Be("Renault");
         result.Value.Model.Should().Be("Clio");
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -60,7 +59,7 @@ public class CarServiceTests
     {
         // Arrange
         var carId = Guid.NewGuid();
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Car?)null);
 
         // Act
@@ -72,7 +71,7 @@ public class CarServiceTests
         result.Errors[0].Should().BeOfType<NotFoundError>();
         var error = result.Errors[0] as NotFoundError;
         error!.ErrorCode.Should().Be(ErrorCode.CAR_NOT_FOUND);
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -107,7 +106,7 @@ public class CarServiceTests
             }
         };
 
-        _mockRepository.Setup(x => x.GetAllAsync())
+        _mockRepository.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(cars);
 
         // Act
@@ -118,14 +117,14 @@ public class CarServiceTests
         result.Value.Should().HaveCount(2);
         result.Value.First().Make.Should().Be("Renault");
         result.Value.Last().Make.Should().Be("Toyota");
-        _mockRepository.Verify(x => x.GetAllAsync(), Times.Once);
+        _mockRepository.Verify(x => x.GetAllAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task GetAllAsync_Should_Return_Empty_List_When_No_Cars()
     {
         // Arrange
-        _mockRepository.Setup(x => x.GetAllAsync())
+        _mockRepository.Setup(x => x.GetAllAsync(It.IsAny<CancellationToken>()))
             .ReturnsAsync(new List<Car>());
 
         // Act
@@ -134,7 +133,7 @@ public class CarServiceTests
         // Assert
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().BeEmpty();
-        _mockRepository.Verify(x => x.GetAllAsync(), Times.Once);
+        _mockRepository.Verify(x => x.GetAllAsync(It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -173,7 +172,7 @@ public class CarServiceTests
             Data = cars
         };
 
-        _mockRepository.Setup(x => x.GetFilteredAsync(filterParams))
+        _mockRepository.Setup(x => x.GetFilteredAsync(filterParams, It.IsAny<CancellationToken>()))
             .ReturnsAsync(paginationResult);
 
         // Act
@@ -186,7 +185,7 @@ public class CarServiceTests
         result.Value.TotalItems.Should().Be(1);
         result.Value.Data.Should().HaveCount(1);
         result.Value.Data[0].Make.Should().Be("Renault");
-        _mockRepository.Verify(x => x.GetFilteredAsync(filterParams), Times.Once);
+        _mockRepository.Verify(x => x.GetFilteredAsync(filterParams, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -209,8 +208,8 @@ public class CarServiceTests
 
         var createdCarId = Guid.NewGuid();
 
-        _mockRepository.Setup(x => x.AddAsync(It.IsAny<Car>()))
-            .ReturnsAsync((Car c) =>
+        _mockRepository.Setup(x => x.AddAsync(It.IsAny<Car>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Car c, CancellationToken _) =>
             {
                 c.Id = createdCarId;
                 return c;
@@ -223,7 +222,7 @@ public class CarServiceTests
         result.IsSuccess.Should().BeTrue();
         result.Value.Should().Be(createdCarId);
         _mockRepository.Verify(x => x.AddAsync(It.Is<Car>(c =>
-            c.Make == "Renault" && c.Model == "Clio" && c.Year == 2020)), Times.Once);
+            c.Make == "Renault" && c.Model == "Clio" && c.Year == 2020), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -256,9 +255,9 @@ public class CarServiceTests
             Mileage = 65000
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingCar);
-        _mockRepository.Setup(x => x.UpdateAsync(existingCar))
+        _mockRepository.Setup(x => x.UpdateAsync(existingCar, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -269,8 +268,8 @@ public class CarServiceTests
         existingCar.Color.Should().Be("Red");
         existingCar.Price.Should().Be(21000);
         existingCar.Mileage.Should().Be(65000);
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-        _mockRepository.Verify(x => x.UpdateAsync(existingCar), Times.Once);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(x => x.UpdateAsync(existingCar, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -288,7 +287,7 @@ public class CarServiceTests
             Mileage = 62000
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Car?)null);
 
         // Act
@@ -300,8 +299,8 @@ public class CarServiceTests
         result.Errors[0].Should().BeOfType<NotFoundError>();
         var error = result.Errors[0] as NotFoundError;
         error!.ErrorCode.Should().Be(ErrorCode.CAR_NOT_FOUND);
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-        _mockRepository.Verify(x => x.UpdateAsync(It.IsAny<Car>()), Times.Never);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(x => x.UpdateAsync(It.IsAny<Car>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -330,7 +329,7 @@ public class CarServiceTests
             Mileage = 50000
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingCar);
 
         // Act
@@ -345,8 +344,8 @@ public class CarServiceTests
         error.Message.Should().Contain("Mileage cannot decrease");
         error.Message.Should().Contain("62000");
         error.Message.Should().Contain("50000");
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-        _mockRepository.Verify(x => x.UpdateAsync(It.IsAny<Car>()), Times.Never);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(x => x.UpdateAsync(It.IsAny<Car>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -375,9 +374,9 @@ public class CarServiceTests
             Mileage = 62000
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingCar);
-        _mockRepository.Setup(x => x.UpdateAsync(existingCar))
+        _mockRepository.Setup(x => x.UpdateAsync(existingCar, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -385,7 +384,7 @@ public class CarServiceTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        _mockRepository.Verify(x => x.UpdateAsync(existingCar), Times.Once);
+        _mockRepository.Verify(x => x.UpdateAsync(existingCar, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -415,9 +414,9 @@ public class CarServiceTests
             IsAvailable = false
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingCar);
-        _mockRepository.Setup(x => x.UpdateAsync(existingCar))
+        _mockRepository.Setup(x => x.UpdateAsync(existingCar, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -430,8 +429,8 @@ public class CarServiceTests
         existingCar.Make.Should().Be("Renault");
         existingCar.Model.Should().Be("Clio");
         existingCar.Mileage.Should().Be(62000);
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-        _mockRepository.Verify(x => x.UpdateAsync(existingCar), Times.Once);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(x => x.UpdateAsync(existingCar, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -444,7 +443,7 @@ public class CarServiceTests
             Price = 21000
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Car?)null);
 
         // Act
@@ -456,8 +455,8 @@ public class CarServiceTests
         result.Errors[0].Should().BeOfType<NotFoundError>();
         var error = result.Errors[0] as NotFoundError;
         error!.ErrorCode.Should().Be(ErrorCode.CAR_NOT_FOUND);
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-        _mockRepository.Verify(x => x.UpdateAsync(It.IsAny<Car>()), Times.Never);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(x => x.UpdateAsync(It.IsAny<Car>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -481,7 +480,7 @@ public class CarServiceTests
             Mileage = 50000
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingCar);
 
         // Act
@@ -494,8 +493,8 @@ public class CarServiceTests
         var error = result.Errors[0] as BusinessRuleError;
         error!.ErrorCode.Should().Be(ErrorCode.INVALID_MILEAGE);
         error.Message.Should().Contain("Mileage cannot decrease");
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-        _mockRepository.Verify(x => x.UpdateAsync(It.IsAny<Car>()), Times.Never);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(x => x.UpdateAsync(It.IsAny<Car>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -528,9 +527,9 @@ public class CarServiceTests
             IsAvailable = false
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingCar);
-        _mockRepository.Setup(x => x.UpdateAsync(existingCar))
+        _mockRepository.Setup(x => x.UpdateAsync(existingCar, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -546,7 +545,7 @@ public class CarServiceTests
         existingCar.VIN.Should().Be("98765432109876543");
         existingCar.Mileage.Should().Be(65000);
         existingCar.IsAvailable.Should().BeFalse();
-        _mockRepository.Verify(x => x.UpdateAsync(existingCar), Times.Once);
+        _mockRepository.Verify(x => x.UpdateAsync(existingCar, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -571,9 +570,9 @@ public class CarServiceTests
             Mileage = null
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingCar);
-        _mockRepository.Setup(x => x.UpdateAsync(existingCar))
+        _mockRepository.Setup(x => x.UpdateAsync(existingCar, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -583,7 +582,7 @@ public class CarServiceTests
         result.IsSuccess.Should().BeTrue();
         existingCar.Mileage.Should().Be(62000);
         existingCar.Price.Should().Be(21000);
-        _mockRepository.Verify(x => x.UpdateAsync(existingCar), Times.Once);
+        _mockRepository.Verify(x => x.UpdateAsync(existingCar, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     #endregion
@@ -606,9 +605,9 @@ public class CarServiceTests
             Mileage = 62000
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(car);
-        _mockRepository.Setup(x => x.DeleteAsync(carId))
+        _mockRepository.Setup(x => x.DeleteAsync(carId, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         // Act
@@ -616,8 +615,8 @@ public class CarServiceTests
 
         // Assert
         result.IsSuccess.Should().BeTrue();
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-        _mockRepository.Verify(x => x.DeleteAsync(carId), Times.Once);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(x => x.DeleteAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -625,7 +624,7 @@ public class CarServiceTests
     {
         // Arrange
         var carId = Guid.NewGuid();
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Car?)null);
 
         // Act
@@ -637,8 +636,8 @@ public class CarServiceTests
         result.Errors[0].Should().BeOfType<NotFoundError>();
         var error = result.Errors[0] as NotFoundError;
         error!.ErrorCode.Should().Be(ErrorCode.CAR_NOT_FOUND);
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-        _mockRepository.Verify(x => x.DeleteAsync(It.IsAny<Guid>()), Times.Never);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRepository.Verify(x => x.DeleteAsync(It.IsAny<Guid>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     #endregion
@@ -650,7 +649,7 @@ public class CarServiceTests
     {
         // Arrange
         var carId = Guid.NewGuid();
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync((Car?)null);
 
         // Act
@@ -662,7 +661,7 @@ public class CarServiceTests
         result.Errors[0].Should().BeOfType<NotFoundError>();
         var error = result.Errors[0] as NotFoundError;
         error!.ErrorCode.Should().Be(ErrorCode.CAR_NOT_FOUND);
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -683,7 +682,7 @@ public class CarServiceTests
             IsAvailable = true
         };
 
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
+        _mockRepository.Setup(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()))
             .ReturnsAsync(car);
 
         // Act
@@ -694,7 +693,7 @@ public class CarServiceTests
         result.Value.Should().NotBeNullOrEmpty();
         result.Value.Should().Contain("car-report-");
         result.Value.Should().EndWith(".txt");
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
+        _mockRepository.Verify(x => x.GetByIdAsync(carId, It.IsAny<CancellationToken>()), Times.Once);
 
         // Clean up
         if (File.Exists(result.Value))

@@ -41,6 +41,7 @@ public abstract class BaseApiController : ControllerBase
                 NotFoundError => NotFound(errorResponse),
                 ValidationFailureError => BadRequest(errorResponse),
                 BusinessRuleError => BadRequest(errorResponse),
+                IoError => StatusCode(StatusCodes.Status500InternalServerError, errorResponse),
                 DatabaseError => StatusCode(StatusCodes.Status500InternalServerError, errorResponse),
                 _ => StatusCode(StatusCodes.Status500InternalServerError, errorResponse)
             };

@@ -12,9 +12,9 @@ public class CarService(ICarRepository carRepository) : ICarService
 {
     private readonly ICarRepository _carRepository = carRepository;
 
-    public async Task<Result<CarDto>> GetByIdAsync(Guid id)
+    public async Task<Result<CarDto>> GetByIdAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var car = await _carRepository.GetByIdAsync(id);
+        var car = await _carRepository.GetByIdAsync(id, cancellationToken);
 
         if (car == null)
         {
@@ -24,15 +24,15 @@ public class CarService(ICarRepository carRepository) : ICarService
         return Result.Ok(CarDto.FromEntity(car));
     }
 
-    public async Task<Result<IEnumerable<CarDto>>> GetAllAsync()
+    public async Task<Result<IEnumerable<CarDto>>> GetAllAsync(CancellationToken cancellationToken = default)
     {
-        var cars = await _carRepository.GetAllAsync();
+        var cars = await _carRepository.GetAllAsync(cancellationToken);
         return Result.Ok(cars.Select(CarDto.FromEntity));
     }
 
-    public async Task<Result<PaginationResult<CarDto>>> GetFilteredAsync(CarParams filterParams)
+    public async Task<Result<PaginationResult<CarDto>>> GetFilteredAsync(CarParams filterParams, CancellationToken cancellationToken = default)
     {
-        var result = await _carRepository.GetFilteredAsync(filterParams);
+        var result = await _carRepository.GetFilteredAsync(filterParams, cancellationToken);
 
         var paginationResult = new PaginationResult<CarDto>
         {
@@ -45,16 +45,16 @@ public class CarService(ICarRepository carRepository) : ICarService
         return Result.Ok(paginationResult);
     }
 
-    public async Task<Result<Guid>> AddAsync(CarUpsertDto carDto)
+    public async Task<Result<Guid>> AddAsync(CarUpsertDto carDto, CancellationToken cancellationToken = default)
     {
         var car = carDto.ToEntity();
-        var createdCar = await _carRepository.AddAsync(car);
+        var createdCar = await _carRepository.AddAsync(car, cancellationToken);
         return Result.Ok(createdCar.Id);
     }
 
-    public async Task<Result> UpdateAsync(Guid id, CarUpsertDto carDto)
+    public async Task<Result> UpdateAsync(Guid id, CarUpsertDto carDto, CancellationToken cancellationToken = default)
     {
-        var existingCar = await _carRepository.GetByIdAsync(id);
+        var existingCar = await _carRepository.GetByIdAsync(id, cancellationToken);
         if (existingCar == null)
         {
             return Result.Fail(new NotFoundError("Resource not found", ErrorCode.CAR_NOT_FOUND));
@@ -73,14 +73,14 @@ public class CarService(ICarRepository carRepository) : ICarService
             return result;
 
         carDto.ApplyTo(existingCar);
-        await _carRepository.UpdateAsync(existingCar);
+        await _carRepository.UpdateAsync(existingCar, cancellationToken);
 
         return Result.Ok();
     }
 
-    public async Task<Result> PatchAsync(Guid id, CarPatchDto patchDto)
+    public async Task<Result> PatchAsync(Guid id, CarPatchDto patchDto, CancellationToken cancellationToken = default)
     {
-        var existingCar = await _carRepository.GetByIdAsync(id);
+        var existingCar = await _carRepository.GetByIdAsync(id, cancellationToken);
         if (existingCar == null)
         {
             return Result.Fail(new NotFoundError("Resource not found", ErrorCode.CAR_NOT_FOUND));
@@ -122,28 +122,28 @@ public class CarService(ICarRepository carRepository) : ICarService
         if (patchDto.IsAvailable.HasValue)
             existingCar.IsAvailable = patchDto.IsAvailable.Value;
 
-        await _carRepository.UpdateAsync(existingCar);
+        await _carRepository.UpdateAsync(existingCar, cancellationToken);
 
         return Result.Ok();
     }
 
-    public async Task<Result> DeleteAsync(Guid id)
+    public async Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var car = await _carRepository.GetByIdAsync(id);
+        var car = await _carRepository.GetByIdAsync(id, cancellationToken);
 
         if (car == null)
         {
             return Result.Fail(new NotFoundError("Resource not found", ErrorCode.CAR_NOT_FOUND));
         }
 
-        await _carRepository.DeleteAsync(id);
+        await _carRepository.DeleteAsync(id, cancellationToken);
 
         return Result.Ok();
     }
 
-    public async Task<Result<string>> GenerateCarReportAsync(Guid id)
+    public async Task<Result<string>> GenerateCarReportAsync(Guid id, CancellationToken cancellationToken = default)
     {
-        var car = await _carRepository.GetByIdAsync(id);
+        var car = await _carRepository.GetByIdAsync(id, cancellationToken);
         if (car == null)
         {
             return Result.Fail(new NotFoundError("Resource not found", ErrorCode.CAR_NOT_FOUND));
@@ -171,23 +171,23 @@ public class CarService(ICarRepository carRepository) : ICarService
             var fileName = $"car-report-{car.Id}-{DateTime.UtcNow:yyyyMMddHHmmss}.txt";
             var filePath = Path.Combine(reportsDir, fileName);
 
-            await File.WriteAllTextAsync(filePath, reportContent);
+            await File.WriteAllTextAsync(filePath, reportContent, cancellationToken);
 
             return Result.Ok(filePath)
                 .WithSuccess($"Report generated successfully at {filePath}");
         }
         catch (UnauthorizedAccessException ex)
         {
-            return Result.Fail(new DatabaseError(
+            return Result.Fail(new IoError(
                 "Access denied when writing report to disk",
-                ErrorCode.DATABASE_ERROR))
+                ErrorCode.FILE_ACCESS_DENIED))
                 .WithError(ex.Message);
         }
         catch (IOException ex)
         {
-            return Result.Fail(new DatabaseError(
+            return Result.Fail(new IoError(
                 "Failed to write report to disk",
-                ErrorCode.DATABASE_ERROR))
+                ErrorCode.FILE_WRITE_FAILED))
                 .WithError(ex.Message);
         }
     }

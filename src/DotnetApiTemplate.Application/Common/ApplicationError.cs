@@ -59,3 +59,14 @@ public class DatabaseError : ApplicationError
     {
     }
 }
+
+/// <summary>
+/// Error for file system / IO failures
+/// </summary>
+public class IoError : ApplicationError
+{
+    public IoError(string message, ErrorCode errorCode = ErrorCode.IO_ERROR)
+        : base(message, errorCode)
+    {
+    }
+}

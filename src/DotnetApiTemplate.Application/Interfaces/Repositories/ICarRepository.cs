@@ -1,5 +1,5 @@
+using DotnetApiTemplate.Application.Common;
 using DotnetApiTemplate.Application.Common.Params;
-using DotnetApiTemplate.Application.DTOs;
 using DotnetApiTemplate.Domain.Entities;
 
 namespace DotnetApiTemplate.Application.Interfaces.Repositories;
@@ -10,9 +10,5 @@ namespace DotnetApiTemplate.Application.Interfaces.Repositories;
 /// </summary>
 public interface ICarRepository : IRepository<Car>
 {
-    // Common CRUD methods (GetByIdAsync, GetAllAsync, AddAsync, UpdateAsync, DeleteAsync)
-    // are inherited from IRepository<Car>
-
-    // Only Car-specific methods are defined here
-    Task<PaginationResult<Car>> GetFilteredAsync(CarParams filterParams);
+    Task<PaginationResult<Car>> GetFilteredAsync(CarParams filterParams, CancellationToken cancellationToken = default);
 }

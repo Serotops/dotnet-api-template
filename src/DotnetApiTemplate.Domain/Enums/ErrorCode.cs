@@ -41,6 +41,11 @@ public enum ErrorCode
     DUPLICATE_ENTRY = 5002,
     CONSTRAINT_VIOLATION = 5003,
 
+    // File System / IO Errors (7000-7999)
+    IO_ERROR = 7000,
+    FILE_ACCESS_DENIED = 7001,
+    FILE_WRITE_FAILED = 7002,
+
     // Authentication/Authorization Errors (6000-6999)
     INVALID_CREDENTIALS = 6000,
     TOKEN_EXPIRED = 6001,

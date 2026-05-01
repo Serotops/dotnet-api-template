@@ -95,6 +95,7 @@ publish/
 # Rename script artifacts
 Backups/
 rename_*.log
+*.Backup.tmp
 
 # Coverage / test results
 **/[Tt]est[Rr]esults/

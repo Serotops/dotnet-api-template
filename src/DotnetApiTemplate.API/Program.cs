@@ -30,21 +30,24 @@ var apiVersionDescriptionProvider =
 
 app.UseStaticFiles();
 
-app.UseSwagger(option =>
+if (app.Environment.IsDevelopment())
 {
-    option.RouteTemplate = "api/{documentName}/swagger.json";
-});
-app.UseSwaggerUI(options =>
-{
-    foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions.Reverse())
+    app.UseSwagger(option =>
     {
-        options.SwaggerEndpoint(
-            $"/api/{description.GroupName}/swagger.json",
-            description.GroupName.ToUpperInvariant());
-    }
-    options.RoutePrefix = "api";
-    options.InjectStylesheet("/api/swagger-custom/swagger-custom-style.css");
-});
+        option.RouteTemplate = "api/{documentName}/swagger.json";
+    });
+    app.UseSwaggerUI(options =>
+    {
+        foreach (var description in apiVersionDescriptionProvider.ApiVersionDescriptions.Reverse())
+        {
+            options.SwaggerEndpoint(
+                $"/api/{description.GroupName}/swagger.json",
+                description.GroupName.ToUpperInvariant());
+        }
+        options.RoutePrefix = "api";
+        options.InjectStylesheet("/api/swagger-custom/swagger-custom-style.css");
+    });
+}
 
 app.UseMiddleware<ResponseWrapperMiddleware>();
 
@@ -54,7 +57,9 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
-// Auto-migrate database (skipped in testing environment)
+// WARNING: Auto-migration at startup is convenient for development but can cause
+// race conditions in multi-instance production deployments. Consider using a
+// dedicated migration step in your CI/CD pipeline for production environments.
 if (!app.Environment.IsEnvironment("Testing"))
 {
     using var scope = app.Services.CreateScope();

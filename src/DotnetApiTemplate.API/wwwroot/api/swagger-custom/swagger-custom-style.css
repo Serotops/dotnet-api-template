@@ -1,0 +1,8 @@
+/* Custom Swagger UI styles */
+.swagger-ui .topbar {
+    background-color: #2d2d2d;
+}
+
+.swagger-ui .info .title {
+    color: #3b4151;
+}

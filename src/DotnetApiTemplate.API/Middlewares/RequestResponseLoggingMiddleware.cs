@@ -1,10 +1,26 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace DotnetApiTemplate.Middlewares;
 
 public class RequestResponseLoggingMiddleware
 {
+    private const int MaxLoggedBodyBytes = 4096;
+
+    private static readonly string[] SensitiveFieldNames =
+    {
+        "password", "passwd", "pwd",
+        "token", "access_token", "refresh_token", "id_token",
+        "authorization", "auth",
+        "secret", "client_secret",
+        "apikey", "api_key",
+        "ssn", "creditcard", "credit_card", "card_number", "cvv"
+    };
+
+    private static readonly Regex JsonFieldRegex = BuildJsonFieldRegex();
+    private static readonly Regex FormFieldRegex = BuildFormFieldRegex();
+
     private readonly RequestDelegate _next;
     private readonly ILogger<RequestResponseLoggingMiddleware> _logger;
 
@@ -16,17 +32,10 @@ public class RequestResponseLoggingMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        // Generate correlation ID
         var correlationId = context.TraceIdentifier;
         context.Response.Headers.Append("X-Correlation-ID", correlationId);
 
-        // Log request
         await LogRequest(context, correlationId);
-
-        // Capture response
-        var originalBodyStream = context.Response.Body;
-        using var responseBody = new MemoryStream();
-        context.Response.Body = responseBody;
 
         var stopwatch = Stopwatch.StartNew();
 
@@ -35,18 +44,12 @@ public class RequestResponseLoggingMiddleware
             await _next(context);
             stopwatch.Stop();
 
-            // Log response
-            await LogResponse(context, correlationId, stopwatch.ElapsedMilliseconds);
-
-            // Copy response back to original stream
-            await responseBody.CopyToAsync(originalBodyStream);
+            LogResponse(context, correlationId, stopwatch.ElapsedMilliseconds);
         }
         catch (Exception ex)
         {
             stopwatch.Stop();
 
-            // Don't log TaskCanceledException or OperationCanceledException as errors
-            // These occur when the client disconnects or cancels the request, which is normal
             if (ex is not TaskCanceledException and not OperationCanceledException)
             {
                 _logger.LogError(ex, "Request failed. CorrelationId: {CorrelationId}, Duration: {Duration}ms",
@@ -60,28 +63,32 @@ public class RequestResponseLoggingMiddleware
 
             throw;
         }
-        finally
-        {
-            context.Response.Body = originalBodyStream;
-        }
     }
 
     private async Task LogRequest(HttpContext context, string correlationId)
     {
-        context.Request.EnableBuffering();
-
         var request = context.Request;
         var requestBody = string.Empty;
 
-        if (request.ContentLength > 0)
+        if (ShouldLogBody(request))
         {
+            request.EnableBuffering();
             request.Body.Position = 0;
             using var reader = new StreamReader(
                 request.Body,
                 Encoding.UTF8,
                 leaveOpen: true);
-            requestBody = await reader.ReadToEndAsync();
+
+            var buffer = new char[MaxLoggedBodyBytes];
+            var read = await reader.ReadBlockAsync(buffer, 0, buffer.Length);
+            requestBody = new string(buffer, 0, read);
+            if (request.ContentLength > MaxLoggedBodyBytes)
+            {
+                requestBody += "...[truncated]";
+            }
             request.Body.Position = 0;
+
+            requestBody = Redact(requestBody);
         }
 
         _logger.LogInformation(
@@ -92,12 +99,8 @@ public class RequestResponseLoggingMiddleware
             requestBody);
     }
 
-    private async Task LogResponse(HttpContext context, string correlationId, long duration)
+    private void LogResponse(HttpContext context, string correlationId, long duration)
     {
-        context.Response.Body.Seek(0, SeekOrigin.Begin);
-        var responseBody = await new StreamReader(context.Response.Body).ReadToEndAsync();
-        context.Response.Body.Seek(0, SeekOrigin.Begin);
-
         _logger.LogInformation(
             "HTTP {Method} {Path} - Status: {StatusCode}, Duration: {Duration}ms, CorrelationId: {CorrelationId}",
             context.Request.Method,
@@ -105,5 +108,50 @@ public class RequestResponseLoggingMiddleware
             context.Response.StatusCode,
             duration,
             correlationId);
+    }
+
+    private static bool ShouldLogBody(HttpRequest request)
+    {
+        if (request.ContentLength is null or 0)
+        {
+            return false;
+        }
+
+        var contentType = request.ContentType ?? string.Empty;
+        if (contentType.Contains("multipart/", StringComparison.OrdinalIgnoreCase) ||
+            contentType.Contains("application/octet-stream", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static string Redact(string body)
+    {
+        if (string.IsNullOrEmpty(body))
+        {
+            return body;
+        }
+
+        body = JsonFieldRegex.Replace(body, m => $"{m.Groups[1].Value}\"***REDACTED***\"");
+        body = FormFieldRegex.Replace(body, m => $"{m.Groups[1].Value}***REDACTED***");
+        return body;
+    }
+
+    private static Regex BuildJsonFieldRegex()
+    {
+        var fields = string.Join("|", SensitiveFieldNames);
+        return new Regex(
+            $"(\"(?:{fields})\"\\s*:\\s*)\"[^\"]*\"",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    }
+
+    private static Regex BuildFormFieldRegex()
+    {
+        var fields = string.Join("|", SensitiveFieldNames);
+        return new Regex(
+            $@"(\b(?:{fields})=)[^&\s]*",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
     }
 }

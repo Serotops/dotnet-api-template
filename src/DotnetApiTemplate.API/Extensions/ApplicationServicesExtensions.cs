@@ -1,4 +1,4 @@
-﻿using DotnetApiTemplate.API.Configuration;
+using DotnetApiTemplate.API.Configuration;
 using DotnetApiTemplate.API.Services;
 using DotnetApiTemplate.Application.Interfaces.Repositories;
 using DotnetApiTemplate.Application.Interfaces.Services;
@@ -9,12 +9,13 @@ using DotnetApiTemplate.Persistence.Interceptors;
 using DotnetApiTemplate.Persistence.Repositories;
 using Asp.Versioning;
 using FluentValidation;
-using Microsoft.AspNetCore.Components;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
 using Npgsql;
 using System.Reflection;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace DotnetApiTemplate.API.Extensions;
 
@@ -28,26 +29,15 @@ public static class ApplicationServicesExtensions
     {
         services.AddControllers(options =>
             {
-                // Add our custom validation filter
                 options.Filters.Add<DotnetApiTemplate.API.Filters.ValidationFilter>();
             })
             .ConfigureApiBehaviorOptions(options =>
             {
-                // Disable automatic model state validation since we handle it in ValidationFilter
                 options.SuppressModelStateInvalidFilter = true;
-            });
-
-        services.AddApiVersioning(opt =>
-        {
-            opt.DefaultApiVersion = new ApiVersion(1, 0);
-            opt.AssumeDefaultVersionWhenUnspecified = true;
-            opt.ReportApiVersions = true;
-            opt.ApiVersionReader = ApiVersionReader.Combine(
-                new UrlSegmentApiVersionReader(),
-                new HeaderApiVersionReader("x-api-version"),
-                new MediaTypeApiVersionReader("x-api-version")
+            })
+            .AddJsonOptions(x =>
+                x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles
             );
-        });
 
         services
         .AddApiVersioning(options =>
@@ -55,6 +45,11 @@ public static class ApplicationServicesExtensions
             options.DefaultApiVersion = new ApiVersion(1, 0);
             options.AssumeDefaultVersionWhenUnspecified = true;
             options.ReportApiVersions = true;
+            options.ApiVersionReader = ApiVersionReader.Combine(
+                new UrlSegmentApiVersionReader(),
+                new HeaderApiVersionReader("x-api-version"),
+                new MediaTypeApiVersionReader("x-api-version")
+            );
         })
         .AddApiExplorer(options =>
         {
@@ -79,6 +74,11 @@ public static class ApplicationServicesExtensions
                 }
             );
 
+            option.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+            {
+                [new OpenApiSecuritySchemeReference("Bearer", document)] = new List<string>()
+            });
+
             var xmlFileName = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
             var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFileName);
 
@@ -92,50 +92,46 @@ public static class ApplicationServicesExtensions
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 
-        // Only register PostgreSQL in non-Testing environments
-        // Testing environment will register InMemory database in WebApplicationFactory
+        var healthChecks = services.AddHealthChecks();
+
         if (!environment.IsEnvironment("Testing"))
         {
+            NpgsqlConnectionStringBuilder connectionStringBuilder = new(
+                config.GetConnectionString("DefaultConnection")
+            );
+
+            connectionStringBuilder.Username =
+                config.GetValue<string>("DB_USER") ?? connectionStringBuilder.Username;
+            connectionStringBuilder.Password =
+                config.GetValue<string>("DB_PASSWORD") ?? connectionStringBuilder.Password;
+
+            var connectionString = connectionStringBuilder.ConnectionString;
+            var migrationsSchema = config.GetValue<string>("ConnectionStrings:Schema") ?? "public";
+
             services.AddDbContext<DotnetApiTemplateDbContext>((sp, options) =>
             {
-                NpgsqlConnectionStringBuilder connectionString = new(
-                    config.GetConnectionString("DefaultConnection")
-                );
-
-                connectionString.Username =
-                    config.GetValue<string>("DB_USER") ?? connectionString.Username;
-                connectionString.Password =
-                    config.GetValue<string>("DB_PASSWORD") ?? connectionString.Password;
-
-                var migrationsSchema = config.GetValue<string>("ConnectionStrings:Schema") ?? "public";
-
                 options.AddInterceptors(sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>());
 
                 options.UseNpgsql(
-                    connectionString.ConnectionString,
+                    connectionString,
                     x => x.MigrationsHistoryTable("__EFMigrationsHistory", migrationsSchema)
                 );
             });
-        }
 
-        services
-        .AddControllers()
-        .AddJsonOptions(x =>
-            x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles
-        );
+            healthChecks.AddNpgSql(
+                connectionString,
+                name: "postgres",
+                tags: new[] { "db", "ready" });
+        }
 
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<ICarRepository, CarRepository>();
 
         services.AddScoped<ICarService, CarService>();
 
-        // Register FluentValidation validators
-        // Note: We DON'T use AddFluentValidationAutoValidation() here because we handle
-        // validation manually in ValidationFilter to have full access to ErrorCodes
         services.AddValidatorsFromAssemblyContaining<CarUpsertDtoValidator>();
 
-        services.AddHealthChecks();
-
+        // TODO: Restrict origins, headers, and methods for production environments
         services.AddCors(c =>
         {
             c.AddPolicy(
@@ -151,7 +147,17 @@ public static class ApplicationServicesExtensions
             );
         });
 
-        services.AddRateLimiter();
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+            options.AddFixedWindowLimiter("fixed", opt =>
+            {
+                opt.PermitLimit = 100;
+                opt.Window = TimeSpan.FromMinutes(1);
+                opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+                opt.QueueLimit = 0;
+            });
+        });
 
         return services;
     }

@@ -1,3 +1,4 @@
+using DotnetApiTemplate.Application.Common;
 using DotnetApiTemplate.Application.DTOs;
 using DotnetApiTemplate.Common;
 using DotnetApiTemplate.Domain.Entities;
