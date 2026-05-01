@@ -14,5 +14,4 @@ public interface ICarService
     Task<Result> UpdateAsync(Guid id, CarUpsertDto car, CancellationToken cancellationToken = default);
     Task<Result> PatchAsync(Guid id, CarPatchDto patchDto, CancellationToken cancellationToken = default);
     Task<Result> DeleteAsync(Guid id, CancellationToken cancellationToken = default);
-    Task<Result<string>> GenerateCarReportAsync(Guid id, CancellationToken cancellationToken = default);
 }

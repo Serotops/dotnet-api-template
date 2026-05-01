@@ -198,26 +198,4 @@ public class CarsController(ICarService carService) : BaseApiController
 
         return NoContent();
     }
-
-    /// <summary>
-    /// Generates a text report for a car and saves it to disk.
-    /// </summary>
-    /// <param name="id">The unique identifier of the car.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The file path where the report was saved.</returns>
-    [HttpPost("{id:guid}/report")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(string))]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<string>> GenerateReport(Guid id, CancellationToken cancellationToken)
-    {
-        var result = await _carService.GenerateCarReportAsync(id, cancellationToken);
-
-        if (result.IsFailed)
-        {
-            return HandleFailure(result);
-        }
-
-        return Ok(result.Value);
-    }
 }
