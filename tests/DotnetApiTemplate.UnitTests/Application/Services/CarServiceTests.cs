@@ -209,8 +209,8 @@ public class CarServiceTests
 
         var createdCarId = Guid.NewGuid();
 
-        _mockRepository.Setup(x => x.AddAsync(It.IsAny<Car>()))
-            .ReturnsAsync((Car c) =>
+        _mockRepository.Setup(x => x.AddAsync(It.IsAny<Car>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Car c, CancellationToken _) =>
             {
                 c.Id = createdCarId;
                 return c;
@@ -639,68 +639,6 @@ public class CarServiceTests
         error!.ErrorCode.Should().Be(ErrorCode.CAR_NOT_FOUND);
         _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
         _mockRepository.Verify(x => x.DeleteAsync(It.IsAny<Guid>()), Times.Never);
-    }
-
-    #endregion
-
-    #region GenerateCarReportAsync Tests
-
-    [Fact]
-    public async Task GenerateCarReportAsync_Should_Return_NotFound_When_Car_Does_Not_Exist()
-    {
-        // Arrange
-        var carId = Guid.NewGuid();
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
-            .ReturnsAsync((Car?)null);
-
-        // Act
-        var result = await _carService.GenerateCarReportAsync(carId);
-
-        // Assert
-        result.IsFailed.Should().BeTrue();
-        result.Errors.Should().ContainSingle();
-        result.Errors[0].Should().BeOfType<NotFoundError>();
-        var error = result.Errors[0] as NotFoundError;
-        error!.ErrorCode.Should().Be(ErrorCode.CAR_NOT_FOUND);
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-    }
-
-    [Fact]
-    public async Task GenerateCarReportAsync_Should_Generate_Report_When_Car_Exists()
-    {
-        // Arrange
-        var carId = Guid.NewGuid();
-        var car = new Car
-        {
-            Id = carId,
-            Make = "Renault",
-            Model = "Clio",
-            Year = 2020,
-            Color = "Black",
-            Price = 22000,
-            VIN = "12345678901234567",
-            Mileage = 62000,
-            IsAvailable = true
-        };
-
-        _mockRepository.Setup(x => x.GetByIdAsync(carId))
-            .ReturnsAsync(car);
-
-        // Act
-        var result = await _carService.GenerateCarReportAsync(carId);
-
-        // Assert
-        result.IsSuccess.Should().BeTrue();
-        result.Value.Should().NotBeNullOrEmpty();
-        result.Value.Should().Contain("car-report-");
-        result.Value.Should().EndWith(".txt");
-        _mockRepository.Verify(x => x.GetByIdAsync(carId), Times.Once);
-
-        // Clean up
-        if (File.Exists(result.Value))
-        {
-            File.Delete(result.Value);
-        }
     }
 
     #endregion

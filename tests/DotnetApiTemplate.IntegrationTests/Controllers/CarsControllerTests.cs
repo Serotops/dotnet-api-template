@@ -1,5 +1,5 @@
 using DotnetApiTemplate.Application.DTOs;
-using DotnetApiTemplate.Common;
+using DotnetApiTemplate.API.Common;
 using DotnetApiTemplate.Domain.Entities;
 using DotnetApiTemplate.IntegrationTests.Base;
 using DotnetApiTemplate.IntegrationTests.Fixtures;
@@ -43,18 +43,15 @@ public class CarsControllerTests : IntegrationTestBase
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.Created);
 
-        var apiResponse = await DeserializeResponse<ApiResponse<CarDto>>(response);
-        apiResponse.Should().NotBeNull();
-        apiResponse!.Success.Should().BeTrue();
-        apiResponse.Data.Should().NotBeNull();
-        apiResponse.Data!.Make.Should().Be("Renault");
-        apiResponse.Data.Model.Should().Be("Clio");
-        apiResponse.Data.Year.Should().Be(2020);
-        apiResponse.Data.Id.Should().NotBeEmpty();
+        var car = await DeserializeResponse<CarDto>(response);
+        car.Should().NotBeNull();
+        car!.Make.Should().Be("Renault");
+        car.Model.Should().Be("Clio");
+        car.Year.Should().Be(2020);
+        car.Id.Should().NotBeEmpty();
 
-        // Verify location header
         response.Headers.Location.Should().NotBeNull();
-        response.Headers.Location!.ToString().Should().Contain(apiResponse.Data.Id.ToString());
+        response.Headers.Location!.ToString().Should().Contain(car.Id.ToString());
     }
 
     [Fact]
@@ -63,7 +60,7 @@ public class CarsControllerTests : IntegrationTestBase
         // Arrange
         var dto = new CarUpsertDto
         {
-            Make = "", // Invalid
+            Make = "",
             Model = "Clio",
             Year = 2020,
             Color = "Black",
@@ -90,12 +87,12 @@ public class CarsControllerTests : IntegrationTestBase
         // Arrange
         var dto = new CarUpsertDto
         {
-            Make = "", // Invalid
-            Model = "", // Invalid
-            Year = 1800, // Invalid (before 1900)
-            Color = "",  // Invalid
-            Price = -100, // Invalid (negative)
-            Mileage = -50 // Invalid (negative)
+            Make = "",
+            Model = "",
+            Year = 1800,
+            Color = "",
+            Price = -100,
+            Mileage = -50
         };
 
         // Act
@@ -137,13 +134,11 @@ public class CarsControllerTests : IntegrationTestBase
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var apiResponse = await DeserializeResponse<ApiResponse<CarDto>>(response);
-        apiResponse.Should().NotBeNull();
-        apiResponse!.Success.Should().BeTrue();
-        apiResponse.Data.Should().NotBeNull();
-        apiResponse.Data!.Id.Should().Be(car.Id);
-        apiResponse.Data.Make.Should().Be("Toyota");
-        apiResponse.Data.Model.Should().Be("Corolla");
+        var result = await DeserializeResponse<CarDto>(response);
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(car.Id);
+        result.Make.Should().Be("Toyota");
+        result.Model.Should().Be("Corolla");
     }
 
     [Fact]
@@ -197,11 +192,9 @@ public class CarsControllerTests : IntegrationTestBase
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var apiResponse = await DeserializeResponse<ApiResponse<List<CarDto>>>(response);
-        apiResponse.Should().NotBeNull();
-        apiResponse!.Success.Should().BeTrue();
-        apiResponse.Data.Should().NotBeNull();
-        apiResponse.Data.Should().HaveCount(2);
+        var result = await DeserializeResponse<List<CarDto>>(response);
+        result.Should().NotBeNull();
+        result.Should().HaveCount(2);
     }
 
     [Fact]
@@ -227,14 +220,12 @@ public class CarsControllerTests : IntegrationTestBase
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var apiResponse = await DeserializeResponse<ApiResponse<PaginationResult<CarDto>>>(response);
-        apiResponse.Should().NotBeNull();
-        apiResponse!.Success.Should().BeTrue();
-        apiResponse.Data.Should().NotBeNull();
-        apiResponse.Data!.PageIndex.Should().Be(1);
-        apiResponse.Data.PageSize.Should().Be(10);
-        apiResponse.Data.TotalItems.Should().Be(15);
-        apiResponse.Data.Data.Should().HaveCount(10);
+        var result = await DeserializeResponse<PaginationResult<CarDto>>(response);
+        result.Should().NotBeNull();
+        result!.PageIndex.Should().Be(1);
+        result.PageSize.Should().Be(10);
+        result.TotalItems.Should().Be(15);
+        result.Data.Should().HaveCount(10);
     }
 
     #endregion
@@ -262,10 +253,10 @@ public class CarsControllerTests : IntegrationTestBase
             Make = "Renault",
             Model = "Clio",
             Year = 2020,
-            Color = "Red", // Changed
-            Price = 21000, // Changed
-            Mileage = 65000, // Increased - valid
-            IsAvailable = false // Changed
+            Color = "Red",
+            Price = 21000,
+            Mileage = 65000,
+            IsAvailable = false
         };
 
         // Act
@@ -274,14 +265,12 @@ public class CarsControllerTests : IntegrationTestBase
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var apiResponse = await DeserializeResponse<ApiResponse<CarDto>>(response);
-        apiResponse.Should().NotBeNull();
-        apiResponse!.Success.Should().BeTrue();
-        apiResponse.Data.Should().NotBeNull();
-        apiResponse.Data!.Color.Should().Be("Red");
-        apiResponse.Data.Price.Should().Be(21000);
-        apiResponse.Data.Mileage.Should().Be(65000);
-        apiResponse.Data.IsAvailable.Should().BeFalse();
+        var result = await DeserializeResponse<CarDto>(response);
+        result.Should().NotBeNull();
+        result!.Color.Should().Be("Red");
+        result.Price.Should().Be(21000);
+        result.Mileage.Should().Be(65000);
+        result.IsAvailable.Should().BeFalse();
     }
 
     [Fact]
@@ -329,7 +318,7 @@ public class CarsControllerTests : IntegrationTestBase
             Year = 2020,
             Color = "Black",
             Price = 22000,
-            Mileage = 50000 // Decreased - invalid
+            Mileage = 50000
         };
 
         // Act
@@ -369,7 +358,6 @@ public class CarsControllerTests : IntegrationTestBase
         {
             Price = 21000,
             IsAvailable = false
-            // Other fields are null - should not be updated
         };
 
         // Act
@@ -378,15 +366,13 @@ public class CarsControllerTests : IntegrationTestBase
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
 
-        var apiResponse = await DeserializeResponse<ApiResponse<CarDto>>(response);
-        apiResponse.Should().NotBeNull();
-        apiResponse!.Success.Should().BeTrue();
-        apiResponse.Data.Should().NotBeNull();
-        apiResponse.Data!.Price.Should().Be(21000);
-        apiResponse.Data.IsAvailable.Should().BeFalse();
-        apiResponse.Data.Make.Should().Be("Renault"); // Should not change
-        apiResponse.Data.Model.Should().Be("Clio"); // Should not change
-        apiResponse.Data.Mileage.Should().Be(62000); // Should not change
+        var result = await DeserializeResponse<CarDto>(response);
+        result.Should().NotBeNull();
+        result!.Price.Should().Be(21000);
+        result.IsAvailable.Should().BeFalse();
+        result.Make.Should().Be("Renault");
+        result.Model.Should().Be("Clio");
+        result.Mileage.Should().Be(62000);
     }
 
     [Fact]
@@ -424,7 +410,7 @@ public class CarsControllerTests : IntegrationTestBase
 
         var patchDto = new CarPatchDto
         {
-            Mileage = 50000 // Decreased - invalid
+            Mileage = 50000
         };
 
         // Act
@@ -465,7 +451,6 @@ public class CarsControllerTests : IntegrationTestBase
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
-        // Verify car is deleted
         var getResponse = await Client.GetAsync($"{BaseUrl}/{car.Id}");
         getResponse.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -478,61 +463,6 @@ public class CarsControllerTests : IntegrationTestBase
 
         // Act
         var response = await Client.DeleteAsync($"{BaseUrl}/{nonExistentId}");
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
-    }
-
-    #endregion
-
-    #region GenerateReport Tests
-
-    [Fact]
-    public async Task GenerateReport_Should_Create_Report_When_Car_Exists()
-    {
-        // Arrange
-        var car = new Car
-        {
-            Make = "Renault",
-            Model = "Clio",
-            Year = 2020,
-            Color = "Black",
-            Price = 22000,
-            VIN = "12345678901234567",
-            Mileage = 62000,
-            IsAvailable = true
-        };
-        DbContext.Cars.Add(car);
-        await SaveAndClearTracking();
-
-        // Act
-        var response = await Client.PostAsync($"{BaseUrl}/{car.Id}/report", null);
-
-        // Assert
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-
-        var apiResponse = await DeserializeResponse<ApiResponse<string>>(response);
-        apiResponse.Should().NotBeNull();
-        apiResponse!.Success.Should().BeTrue();
-        apiResponse.Data.Should().NotBeNullOrEmpty();
-        apiResponse.Data.Should().Contain("car-report-");
-        apiResponse.Data.Should().EndWith(".txt");
-
-        // Clean up - delete the generated report file if it exists
-        if (File.Exists(apiResponse.Data))
-        {
-            File.Delete(apiResponse.Data);
-        }
-    }
-
-    [Fact]
-    public async Task GenerateReport_Should_Return_NotFound_When_Car_Does_Not_Exist()
-    {
-        // Arrange
-        var nonExistentId = Guid.NewGuid();
-
-        // Act
-        var response = await Client.PostAsync($"{BaseUrl}/{nonExistentId}/report", null);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);

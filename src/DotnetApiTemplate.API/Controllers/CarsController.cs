@@ -3,9 +3,10 @@ using DotnetApiTemplate.Application.Common.Params;
 using DotnetApiTemplate.Application.DTOs;
 using DotnetApiTemplate.Application.Interfaces.Services;
 using Asp.Versioning;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace DotnetApiTemplate.Controllers;
+namespace DotnetApiTemplate.API.Controllers;
 
 [ApiController]
 [ApiVersion("1.0")]
@@ -20,13 +21,14 @@ public class CarsController(ICarService carService) : BaseApiController
     /// Retrieves a car by its unique identifier.
     /// </summary>
     /// <param name="id">The unique identifier of the car.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The car with the specified ID.</returns>
     [HttpGet("{id:guid}")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(CarDto))]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<CarDto>> GetById(Guid id)
+    public async Task<ActionResult<CarDto>> GetById(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _carService.GetByIdAsync(id);
+        var result = await _carService.GetByIdAsync(id, cancellationToken);
 
         if (result.IsFailed)
         {
@@ -39,12 +41,13 @@ public class CarsController(ICarService carService) : BaseApiController
     /// <summary>
     /// Retrieves all cars.
     /// </summary>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A list of all cars.</returns>
     [HttpGet("all")]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(IEnumerable<CarDto>))]
-    public async Task<ActionResult<IEnumerable<CarDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<CarDto>>> GetAll(CancellationToken cancellationToken)
     {
-        var result = await _carService.GetAllAsync();
+        var result = await _carService.GetAllAsync(cancellationToken);
 
         if (result.IsFailed)
         {
@@ -58,12 +61,13 @@ public class CarsController(ICarService carService) : BaseApiController
     /// Retrieves cars with pagination and filtering.
     /// </summary>
     /// <param name="filterParams">Pagination and filter parameters.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A paginated list of cars matching the filter criteria.</returns>
     [HttpGet]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(PaginationResult<CarDto>))]
-    public async Task<ActionResult<PaginationResult<CarDto>>> GetFiltered([FromQuery] CarParams filterParams)
+    public async Task<ActionResult<PaginationResult<CarDto>>> GetFiltered([FromQuery] CarParams filterParams, CancellationToken cancellationToken)
     {
-        var result = await _carService.GetFilteredAsync(filterParams);
+        var result = await _carService.GetFilteredAsync(filterParams, cancellationToken);
 
         if (result.IsFailed)
         {
@@ -77,13 +81,16 @@ public class CarsController(ICarService carService) : BaseApiController
     /// Creates a new car.
     /// </summary>
     /// <param name="dto">The car data to create.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The created car.</returns>
     [HttpPost]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status201Created, Type = typeof(CarDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
-    public async Task<ActionResult<CarDto>> Create([FromBody] CarUpsertDto dto)
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<CarDto>> Create([FromBody] CarUpsertDto dto, CancellationToken cancellationToken)
     {
-        var createResult = await _carService.AddAsync(dto);
+        var createResult = await _carService.AddAsync(dto, cancellationToken);
 
         if (createResult.IsFailed)
         {
@@ -91,7 +98,7 @@ public class CarsController(ICarService carService) : BaseApiController
         }
 
         var id = createResult.Value;
-        var getResult = await _carService.GetByIdAsync(id);
+        var getResult = await _carService.GetByIdAsync(id, cancellationToken);
 
         if (getResult.IsFailed)
         {
@@ -106,14 +113,17 @@ public class CarsController(ICarService carService) : BaseApiController
     /// </summary>
     /// <param name="id">The unique identifier of the car to update.</param>
     /// <param name="dto">The updated car data.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The updated car.</returns>
     [HttpPut("{id:guid}")]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(CarDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<CarDto>> Update(Guid id, [FromBody] CarUpsertDto dto)
+    public async Task<ActionResult<CarDto>> Update(Guid id, [FromBody] CarUpsertDto dto, CancellationToken cancellationToken)
     {
-        var updateResult = await _carService.UpdateAsync(id, dto);
+        var updateResult = await _carService.UpdateAsync(id, dto, cancellationToken);
 
         if (updateResult.IsFailed)
         {
@@ -121,7 +131,7 @@ public class CarsController(ICarService carService) : BaseApiController
         }
 
         // Get the updated car to return it
-        var getResult = await _carService.GetByIdAsync(id);
+        var getResult = await _carService.GetByIdAsync(id, cancellationToken);
 
         if (getResult.IsFailed)
         {
@@ -137,6 +147,7 @@ public class CarsController(ICarService carService) : BaseApiController
     /// </summary>
     /// <param name="id">The unique identifier of the car to update.</param>
     /// <param name="patchDto">The properties to update.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The updated car.</returns>
     /// <remarks>
     /// Sample request:
@@ -150,12 +161,14 @@ public class CarsController(ICarService carService) : BaseApiController
     /// You can update any combination of properties. Omitted properties will not be changed.
     /// </remarks>
     [HttpPatch("{id:guid}")]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(CarDto))]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<CarDto>> Patch(Guid id, [FromBody] CarPatchDto patchDto)
+    public async Task<ActionResult<CarDto>> Patch(Guid id, [FromBody] CarPatchDto patchDto, CancellationToken cancellationToken)
     {
-        var patchResult = await _carService.PatchAsync(id, patchDto);
+        var patchResult = await _carService.PatchAsync(id, patchDto, cancellationToken);
 
         if (patchResult.IsFailed)
         {
@@ -163,7 +176,7 @@ public class CarsController(ICarService carService) : BaseApiController
         }
 
         // Get the updated car to return it
-        var getResult = await _carService.GetByIdAsync(id);
+        var getResult = await _carService.GetByIdAsync(id, cancellationToken);
 
         if (getResult.IsFailed)
         {
@@ -177,13 +190,16 @@ public class CarsController(ICarService carService) : BaseApiController
     /// Deletes a car.
     /// </summary>
     /// <param name="id">The unique identifier of the car to delete.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>No content.</returns>
     [HttpDelete("{id:guid}")]
+    [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult> Delete(Guid id)
+    public async Task<ActionResult> Delete(Guid id, CancellationToken cancellationToken)
     {
-        var result = await _carService.DeleteAsync(id);
+        var result = await _carService.DeleteAsync(id, cancellationToken);
 
         if (result.IsFailed)
         {
@@ -193,27 +209,4 @@ public class CarsController(ICarService carService) : BaseApiController
         return NoContent();
     }
 
-    /// <summary>
-    /// Generates a text report for a car and saves it to disk.
-    /// This endpoint demonstrates when to use exceptions vs Result pattern.
-    /// - Business failures (car not found) use Result pattern
-    /// - Infrastructure failures (disk write errors) can throw exceptions
-    /// </summary>
-    /// <param name="id">The unique identifier of the car.</param>
-    /// <returns>The file path where the report was saved.</returns>
-    [HttpPost("{id:guid}/report")]
-    [ProducesResponseType(StatusCodes.Status200OK, Type = typeof(string))]
-    [ProducesResponseType(StatusCodes.Status404NotFound)]
-    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
-    public async Task<ActionResult<string>> GenerateReport(Guid id)
-    {
-        var result = await _carService.GenerateCarReportAsync(id);
-
-        if (result.IsFailed)
-        {
-            return HandleFailure(result);
-        }
-
-        return Ok(result.Value);
-    }
 }

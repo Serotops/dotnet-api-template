@@ -1,0 +1,23 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Quality bar inherited by every project in the solution -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+
+    <!-- Suppressed analyzer rules, with rationale:
+         CA1707 - ErrorCode enum members use SCREAMING_SNAKE_CASE intentionally; they are a
+                  serialized API contract, not internal identifiers.
+         CA1848 - LoggerMessage source-gen delegates add ceremony that hurts readability in a
+                  template; structured logging via ILogger extension methods is fine here.
+         CA1000 - static factory methods on generic response types (ApiResponse<T>) are idiomatic. -->
+    <NoWarn>$(NoWarn);CA1707;CA1848;CA1000</NoWarn>
+  </PropertyGroup>
+
+</Project>

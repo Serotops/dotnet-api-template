@@ -1,4 +1,4 @@
-using DotnetApiTemplate.Common;
+using DotnetApiTemplate.API.Common;
 using DotnetApiTemplate.Domain.Enums;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;

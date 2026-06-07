@@ -1,6 +1,6 @@
 {
   "$schema": "http://json.schemastore.org/template",
-  "author": "DotnetApiTemplate",
+  "author": "Bilel H",
   "classifications": [
     "Web",
     "API",
@@ -17,6 +17,9 @@
   },
   "sourceName": "DotnetApiTemplate",
   "preferNameDirectory": true,
+  "guids": [
+    "d9f8b8f1-8c1a-4d5e-9f8b-8f18c1a4d5e9"
+  ],
   "sources": [
     {
       "modifiers": [

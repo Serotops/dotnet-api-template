@@ -1,4 +1,4 @@
-namespace DotnetApiTemplate.Common;
+namespace DotnetApiTemplate.API.Common;
 
 /// <summary>
 /// Represents a field-level validation error

@@ -14,5 +14,5 @@ public interface ICarRepository : IRepository<Car>
     // are inherited from IRepository<Car>
 
     // Only Car-specific methods are defined here
-    Task<PaginationResult<Car>> GetFilteredAsync(CarParams filterParams);
+    Task<PaginationResult<Car>> GetFilteredAsync(CarParams filterParams, CancellationToken cancellationToken = default);
 }

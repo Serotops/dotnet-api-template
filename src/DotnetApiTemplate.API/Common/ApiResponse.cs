@@ -1,6 +1,6 @@
 using DotnetApiTemplate.Domain.Enums;
 
-namespace DotnetApiTemplate.Common;
+namespace DotnetApiTemplate.API.Common;
 
 public class ApiResponse<T>
 {
@@ -11,16 +11,6 @@ public class ApiResponse<T>
     public List<string>? Errors { get; set; }
     public List<ValidationError>? ValidationErrors { get; set; }
     public string? TraceId { get; set; }
-
-    public static ApiResponse<T> SuccessResponse(T data, string? message = null)
-    {
-        return new ApiResponse<T>
-        {
-            Success = true,
-            Data = data,
-            Message = message
-        };
-    }
 
     public static ApiResponse<T> ErrorResponse(
         string message,

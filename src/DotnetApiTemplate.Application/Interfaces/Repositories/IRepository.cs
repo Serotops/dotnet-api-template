@@ -14,13 +14,13 @@ public interface IRepository<T> where T : Entity
     /// </summary>
     /// <param name="id">The unique identifier of the entity</param>
     /// <returns>The entity if found; otherwise null</returns>
-    Task<T?> GetByIdAsync(Guid id);
+    Task<T?> GetByIdAsync(Guid id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Retrieves all entities.
     /// </summary>
     /// <returns>A collection of all entities</returns>
-    Task<IEnumerable<T>> GetAllAsync();
+    Task<IEnumerable<T>> GetAllAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Adds a new entity to the repository.
@@ -28,18 +28,18 @@ public interface IRepository<T> where T : Entity
     /// </summary>
     /// <param name="entity">The entity to add</param>
     /// <returns>The added entity with generated values</returns>
-    Task<T> AddAsync(T entity);
+    Task<T> AddAsync(T entity, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Updates an existing entity.
     /// Automatically sets ModifiedAt timestamp if entity is AuditableEntity.
     /// </summary>
     /// <param name="entity">The entity to update</param>
-    Task UpdateAsync(T entity);
+    Task UpdateAsync(T entity, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Deletes an entity by its unique identifier.
     /// </summary>
     /// <param name="id">The unique identifier of the entity to delete</param>
-    Task DeleteAsync(Guid id);
+    Task DeleteAsync(Guid id, CancellationToken cancellationToken = default);
 }

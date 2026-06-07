@@ -20,9 +20,9 @@ public class CarRepository(DotnetApiTemplateDbContext context)
     /// Retrieves cars with pagination and filtering.
     /// This is a Car-specific method that implements custom filtering logic.
     /// </summary>
-    public async Task<PaginationResult<Car>> GetFilteredAsync(CarParams filterParams)
+    public async Task<PaginationResult<Car>> GetFilteredAsync(CarParams filterParams, CancellationToken cancellationToken = default)
     {
-        var query = _dbSet.AsQueryable();
+        var query = DbSet.AsQueryable();
 
         // Filters
         if (!string.IsNullOrEmpty(filterParams.Make))
@@ -61,11 +61,11 @@ public class CarRepository(DotnetApiTemplateDbContext context)
         };
 
         // Total before pagination
-        var totalItems = await query.CountAsync();
+        var totalItems = await query.CountAsync(cancellationToken);
 
         // Pagination
         var skip = (filterParams.PageIndex - 1) * filterParams.PageSize;
-        var data = await query.Skip(skip).Take(filterParams.PageSize).ToListAsync();
+        var data = await query.Skip(skip).Take(filterParams.PageSize).ToListAsync(cancellationToken);
 
         return new PaginationResult<Car>
         {

@@ -1,10 +1,10 @@
 using System.Net;
 using System.Text.Json;
-using DotnetApiTemplate.Common;
+using DotnetApiTemplate.API.Common;
 using DotnetApiTemplate.Domain.Enums;
 using FluentValidation;
 
-namespace DotnetApiTemplate.Middlewares;
+namespace DotnetApiTemplate.API.Middlewares;
 
 /// <summary>
 /// Middleware to handle UNEXPECTED exceptions that were not caught by the Result pattern.
@@ -23,6 +23,12 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
     private readonly RequestDelegate _next = next;
     private readonly ILogger<ExceptionHandlingMiddleware> _logger = logger;
 
+    private static readonly JsonSerializerOptions SerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+    };
+
     public async Task InvokeAsync(HttpContext context)
     {
         try
@@ -37,6 +43,16 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
             {
                 // Just return without handling - the response will naturally fail
                 return;
+            }
+
+            // If the response has already started, we can't write a clean error payload —
+            // doing so would throw and mask the original exception. Let it propagate.
+            if (context.Response.HasStarted)
+            {
+                _logger.LogWarning(ex,
+                    "Response already started; cannot write error body. CorrelationId: {CorrelationId}",
+                    context.TraceIdentifier);
+                throw;
             }
 
             await HandleExceptionAsync(context, ex);
@@ -81,15 +97,14 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
                 _logger.LogError(dbEx, "Database update error: {InnerMessage}", dbEx.InnerException?.Message);
                 break;
 
-            // IO/File system exceptions (like in GenerateCarReportAsync)
-            case IOException ioEx:
+            case IOException:
                 statusCode = HttpStatusCode.InternalServerError;
                 message = "An error occurred while accessing the file system";
                 errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
                 errors = new List<string> { "File system error" };
                 break;
 
-            case UnauthorizedAccessException uaEx:
+            case UnauthorizedAccessException:
                 statusCode = HttpStatusCode.InternalServerError;
                 message = "Access denied to a system resource";
                 errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
@@ -97,7 +112,7 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
                 break;
 
             // HTTP/Network exceptions
-            case HttpRequestException httpEx:
+            case HttpRequestException:
                 statusCode = HttpStatusCode.BadGateway;
                 message = "An error occurred while communicating with an external service";
                 errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
@@ -131,13 +146,7 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)statusCode;
 
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
-        };
-
-        var json = JsonSerializer.Serialize(response, options);
+        var json = JsonSerializer.Serialize(response, SerializerOptions);
         await context.Response.WriteAsync(json);
     }
 }

@@ -1,13 +1,16 @@
-namespace DotnetApiTemplate.Middlewares;
+namespace DotnetApiTemplate.API.Middlewares;
 
-public class SecurityHeadersMiddleware
+public class SecurityHeadersMiddleware(RequestDelegate next, IWebHostEnvironment environment)
 {
-    private readonly RequestDelegate _next;
+    // Swagger UI needs inline scripts/styles, so the relaxed policy is only used in
+    // Development. Production serves JSON only and gets a locked-down policy.
+    private const string DevelopmentCsp =
+        "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; " +
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; " +
+        "font-src 'self' data:; connect-src 'self'";
 
-    public SecurityHeadersMiddleware(RequestDelegate next)
-    {
-        _next = next;
-    }
+    private const string ProductionCsp =
+        "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
 
     public async Task InvokeAsync(HttpContext context)
     {
@@ -29,12 +32,12 @@ public class SecurityHeadersMiddleware
 
         // Content-Security-Policy: Helps prevent XSS and other code injection attacks
         context.Response.Headers.Append("Content-Security-Policy",
-            "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'");
+            environment.IsDevelopment() ? DevelopmentCsp : ProductionCsp);
 
         // Remove server header for security
         context.Response.Headers.Remove("Server");
         context.Response.Headers.Remove("X-Powered-By");
 
-        await _next(context);
+        await next(context);
     }
 }

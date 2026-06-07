@@ -1,0 +1,14 @@
+<Project>
+
+  <!-- Inherit the root quality settings... -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <!-- ...but don't fail test builds on analyzer/test-tooling warnings, and skip the
+         design/perf analyzers entirely for test code where they add noise, not value. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

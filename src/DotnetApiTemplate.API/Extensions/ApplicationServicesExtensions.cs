@@ -1,4 +1,4 @@
-﻿using DotnetApiTemplate.API.Configuration;
+using DotnetApiTemplate.API.Configuration;
 using DotnetApiTemplate.API.Services;
 using DotnetApiTemplate.Application.Interfaces.Repositories;
 using DotnetApiTemplate.Application.Interfaces.Services;
@@ -9,12 +9,16 @@ using DotnetApiTemplate.Persistence.Interceptors;
 using DotnetApiTemplate.Persistence.Repositories;
 using Asp.Versioning;
 using FluentValidation;
-using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
 using Npgsql;
 using System.Reflection;
+using System.Text;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 
 namespace DotnetApiTemplate.API.Extensions;
 
@@ -28,16 +32,18 @@ public static class ApplicationServicesExtensions
     {
         services.AddControllers(options =>
             {
-                // Add our custom validation filter
                 options.Filters.Add<DotnetApiTemplate.API.Filters.ValidationFilter>();
             })
             .ConfigureApiBehaviorOptions(options =>
             {
-                // Disable automatic model state validation since we handle it in ValidationFilter
                 options.SuppressModelStateInvalidFilter = true;
-            });
+            })
+            .AddJsonOptions(x =>
+                x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles
+            );
 
-        services.AddApiVersioning(opt =>
+        services
+        .AddApiVersioning(opt =>
         {
             opt.DefaultApiVersion = new ApiVersion(1, 0);
             opt.AssumeDefaultVersionWhenUnspecified = true;
@@ -47,14 +53,6 @@ public static class ApplicationServicesExtensions
                 new HeaderApiVersionReader("x-api-version"),
                 new MediaTypeApiVersionReader("x-api-version")
             );
-        });
-
-        services
-        .AddApiVersioning(options =>
-        {
-            options.DefaultApiVersion = new ApiVersion(1, 0);
-            options.AssumeDefaultVersionWhenUnspecified = true;
-            options.ReportApiVersions = true;
         })
         .AddApiExplorer(options =>
         {
@@ -79,6 +77,11 @@ public static class ApplicationServicesExtensions
                 }
             );
 
+            option.AddSecurityRequirement(document => new OpenApiSecurityRequirement
+            {
+                [new OpenApiSecuritySchemeReference("Bearer", document)] = []
+            });
+
             var xmlFileName = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
             var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFileName);
 
@@ -92,8 +95,51 @@ public static class ApplicationServicesExtensions
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<AuditableEntitySaveChangesInterceptor>();
 
-        // Only register PostgreSQL in non-Testing environments
-        // Testing environment will register InMemory database in WebApplicationFactory
+        var jwtSection = config.GetSection("Jwt");
+        var signingKey = jwtSection.GetValue<string>("SigningKey");
+
+        // The signing key is a secret: supply it via environment variable
+        // (Jwt__SigningKey), user-secrets, or a secret manager -- never commit it.
+        // Fail fast rather than start with a missing/weak key (HS256 needs >= 256 bits).
+        // Skipped under the Testing environment, where authentication is stubbed.
+        if (!environment.IsEnvironment("Testing")
+            && (string.IsNullOrWhiteSpace(signingKey) || Encoding.UTF8.GetByteCount(signingKey) < 32))
+        {
+            throw new InvalidOperationException(
+                "Jwt:SigningKey is missing or too short. Provide at least 32 bytes via the " +
+                "Jwt__SigningKey environment variable, user-secrets, or a secret manager.");
+        }
+
+        services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                options.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtSection.GetValue<string>("Issuer"),
+                    ValidAudience = jwtSection.GetValue<string>("Audience"),
+                    IssuerSigningKey = string.IsNullOrEmpty(signingKey)
+                        ? null
+                        : new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey))
+                };
+            });
+
+        services.AddAuthorization();
+
+        // The demo token endpoint mints credential-free JWTs. Refuse to start if someone
+        // enables it outside Development, so a misconfigured deploy fails loudly instead
+        // of silently exposing an authentication bypass.
+        if (config.GetValue("Auth:EnableDemoTokenEndpoint", false) && !environment.IsDevelopment())
+        {
+            throw new InvalidOperationException(
+                "Auth:EnableDemoTokenEndpoint is true outside the Development environment. " +
+                "The demo token endpoint must never be enabled in production — remove the flag " +
+                "and implement a real credential-verifying authentication flow.");
+        }
+
         if (!environment.IsEnvironment("Testing"))
         {
             services.AddDbContext<DotnetApiTemplateDbContext>((sp, options) =>
@@ -118,23 +164,42 @@ public static class ApplicationServicesExtensions
             });
         }
 
-        services
-        .AddControllers()
-        .AddJsonOptions(x =>
-            x.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles
-        );
-
         services.AddScoped(typeof(IRepository<>), typeof(Repository<>));
         services.AddScoped<ICarRepository, CarRepository>();
-
         services.AddScoped<ICarService, CarService>();
 
-        // Register FluentValidation validators
-        // Note: We DON'T use AddFluentValidationAutoValidation() here because we handle
-        // validation manually in ValidationFilter to have full access to ErrorCodes
         services.AddValidatorsFromAssemblyContaining<CarUpsertDtoValidator>();
 
-        services.AddHealthChecks();
+        services.AddHealthChecks()
+            .AddDbContextCheck<DotnetApiTemplateDbContext>("database", tags: ["ready"]);
+
+        var rateLimitSection = config.GetSection("RateLimiting");
+        var permitLimit = rateLimitSection.GetValue("PermitLimit", 100);
+        var windowSeconds = rateLimitSection.GetValue("WindowSeconds", 10);
+        var queueLimit = rateLimitSection.GetValue("QueueLimit", 0);
+
+        services.AddRateLimiter(options =>
+        {
+            options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+            // Global fixed-window limiter partitioned by client IP. Adjust or replace
+            // with per-endpoint policies as your API grows.
+            options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
+            {
+                var partitionKey = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+                return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ =>
+                    new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = permitLimit,
+                        Window = TimeSpan.FromSeconds(windowSeconds),
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = queueLimit
+                    });
+            });
+        });
+
+        var allowedOrigins = config.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 
         services.AddCors(c =>
         {
@@ -142,16 +207,24 @@ public static class ApplicationServicesExtensions
                 "AllowOrigin",
                 options =>
                 {
+                    if (allowedOrigins.Length == 0)
+                    {
+                        options.AllowAnyOrigin();
+                    }
+                    else
+                    {
+                        options
+                            .WithOrigins(allowedOrigins)
+                            .AllowCredentials();
+                    }
+
                     options
-                        .AllowAnyOrigin()
                         .AllowAnyHeader()
                         .AllowAnyMethod()
                         .WithExposedHeaders("Content-Disposition", "Content-Type");
                 }
             );
         });
-
-        services.AddRateLimiter();
 
         return services;
     }

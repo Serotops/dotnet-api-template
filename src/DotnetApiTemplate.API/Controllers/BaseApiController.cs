@@ -1,10 +1,10 @@
 using DotnetApiTemplate.Application.Common;
-using DotnetApiTemplate.Common;
+using DotnetApiTemplate.API.Common;
 using DotnetApiTemplate.Domain.Enums;
 using FluentResults;
 using Microsoft.AspNetCore.Mvc;
 
-namespace DotnetApiTemplate.Controllers;
+namespace DotnetApiTemplate.API.Controllers;
 
 /// <summary>
 /// Base controller providing common functionality for all API controllers.

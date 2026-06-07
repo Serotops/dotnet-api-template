@@ -53,3 +53,7 @@ csharp_space_after_keywords_in_control_flow_statements = true
 # Unnecessary code
 dotnet_code_quality_unused_parameters = all:suggestion
 csharp_style_unused_value_assignment_preference = discard_variable:suggestion
+
+# EF Core migrations are tool-generated; don't subject them to analyzers
+[**/Migrations/*.cs]
+generated_code = true
