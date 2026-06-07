@@ -3,204 +3,274 @@
 [![CI](https://github.com/Serotops/dotnet-api-template/actions/workflows/ci.yml/badge.svg)](https://github.com/Serotops/dotnet-api-template/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A clean architecture ASP.NET Core API template. Clone it, rename it, and start building.
+A starting point for ASP.NET Core APIs built with clean architecture. It comes with a working
+sample resource (`Car`), JWT auth, validation, structured logging, health checks, rate limiting,
+Docker, and a test suite, so you can delete the sample and build your own thing instead of wiring
+the plumbing from scratch.
 
-## Tech Stack
+Target framework is .NET 10. The database is PostgreSQL through EF Core (Npgsql).
 
-- **.NET 10** / ASP.NET Core
-- **PostgreSQL** with EF Core (Npgsql)
-- **Serilog** for structured logging
-- **FluentValidation** for request validation
-- **FluentResults** for the Result pattern
-- **Swagger / OpenAPI** with API versioning
-- **xUnit** with FluentAssertions for testing
-- **Docker** for containerization
+## What's in the box
 
-## Architecture
+- Clean architecture split across five projects (Domain, Application, Persistence, Infrastructure, API)
+- EF Core with a generic repository, a sample entity, and an audit interceptor
+- Request validation with FluentValidation, surfaced through a custom action filter
+- The Result pattern (FluentResults) for expected failures, exceptions for the rest
+- JWT bearer authentication, with a clearly-marked demo token endpoint for local use
+- Per-IP rate limiting, configurable security headers, and CORS driven by config
+- Liveness and readiness health checks
+- Serilog logging (console everywhere, rolling file in development)
+- Swagger UI with API versioning, available in development
+- A multi-stage Dockerfile that runs as a non-root user
+- xUnit tests (unit and integration), Central Package Management, analyzers as errors
+- GitHub Actions CI that also proves the template still scaffolds
+
+## Layout
 
 ```
 src/
-  DotnetApiTemplate.Domain           # Entities, enums, exceptions -- no dependencies
-  DotnetApiTemplate.Application      # Services, DTOs, validators, interfaces
-  DotnetApiTemplate.Persistence      # DbContext, repositories, EF configs, interceptors
-  DotnetApiTemplate.Infrastructure   # External services (auth, email, etc.)
-  DotnetApiTemplate.API              # Controllers, middlewares, startup
+  DotnetApiTemplate.Domain          Entities, enums. No dependencies on anything else.
+  DotnetApiTemplate.Application     Services, DTOs, validators, interfaces.
+  DotnetApiTemplate.Persistence     DbContext, repositories, EF configs, interceptors, migrations.
+  DotnetApiTemplate.Infrastructure  Cross-cutting integrations (email, external APIs, ...).
+  DotnetApiTemplate.API             Controllers, middleware, DI wiring, entry point.
 
 tests/
   DotnetApiTemplate.UnitTests
   DotnetApiTemplate.IntegrationTests
 ```
 
-Dependencies flow inward: API -> Application -> Domain. Persistence and Infrastructure depend on Domain and Application, never on each other.
+Dependencies point inward. API depends on Application, Application depends on Domain. Persistence
+and Infrastructure depend on Domain and Application but never on each other, and Domain depends on
+nothing. If you find yourself wanting Persistence to reference Infrastructure (or vice versa), put
+the shared abstraction in Application instead.
 
-## Quick Start
+## Running it locally
+
+You need the .NET 10 SDK and Docker.
 
 ```bash
-# 1. Copy the example environment file (optional - defaults work out of the box)
-cp .env.example .env
-
-# 2. Start the database
-docker compose up -d
-
-# 3. Run the API
+cp .env.example .env              # optional, the defaults already work
+docker compose up -d              # PostgreSQL, published on localhost:54320
 dotnet run --project src/DotnetApiTemplate.API
 ```
 
-The API will be available at `https://localhost:7001` (or the port in `launchSettings.json`).
-Swagger UI is at `/api` (Development environment only).
+The API listens on `https://localhost:7001` and `http://localhost:5001` (see
+`Properties/launchSettings.json`). Swagger UI is at `/api`, and only in development.
 
-In Development, migrations run automatically on startup (`Database:MigrateOnStartup` is `true`
-in `appsettings.Development.json`). See [Database migrations](#database-migrations) for production.
+In development the database schema is created for you on startup, because
+`Database:MigrateOnStartup` is `true` in `appsettings.Development.json`. Production is a different
+story, covered under [Migrations](#migrations).
 
-## Use as a Template
+## Using it as a template
 
-### Option 1: dotnet new (recommended)
+The project is registered as a `dotnet new` template, which is the cleaner option because the
+template engine rewrites namespaces, project names, folders, the solution file, Docker config, and
+the database name in one shot.
 
 ```bash
-# Clone and install the template
 git clone https://github.com/Serotops/dotnet-api-template.git
 dotnet new install ./dotnet-api-template
 
-# Create a new project
 dotnet new dotnet-api -n MyProject -o ./MyProject
 
-# Start working
 cd MyProject
 docker compose up -d
 dotnet run --project src/MyProject.API
 ```
 
-The template engine automatically renames all namespaces, projects, folders, Docker config, and database names.
+Each scaffold also gets a fresh `UserSecretsId`, so two projects generated from the template don't
+end up sharing the same local secret store.
 
-### Option 2: Manual clone
+If you'd rather not use the template engine, clone the repo and find-and-replace
+`DotnetApiTemplate` with your project name across the files, folders, and the `.sln`.
 
-Clone the repo, then do a find-and-replace of `DotnetApiTemplate` with your project name across all files, folders, and the `.sln` file.
+## How requests flow
 
-## Project Features
+Middleware runs in this order (see `Program.cs`):
 
-### Middleware Pipeline
+1. HSTS, only outside development.
+2. CORS.
+3. Security headers (`SecurityHeadersMiddleware`).
+4. Exception handling (`ExceptionHandlingMiddleware`).
+5. Request/response logging (`RequestResponseLoggingMiddleware`).
+6. Rate limiter.
+7. Swagger, only in development.
+8. Authentication, then authorization.
 
-Requests flow through these middlewares in order:
+Successful responses return the DTO directly. Failures are wrapped in `ApiResponse<T>` with an
+error code, a list of messages, and the correlation id, so clients get a predictable error shape
+without it leaking into the happy path.
 
-1. **Security Headers** -- X-Frame-Options, CSP, Permissions-Policy, etc.
-2. **Exception Handling** -- catches unhandled exceptions, returns a structured `ApiResponse<T>` error
-3. **Request/Response Logging** -- logs HTTP traffic with correlation IDs; request bodies are logged with sensitive fields (passwords, tokens, etc.) redacted
+### Error handling
 
-Successful responses are returned as-is (the DTO directly). Errors are returned wrapped in `ApiResponse<T>` with an error code, message list, and trace id.
+There are two layers, and they don't overlap:
 
-### Repository Pattern
-
-A generic `Repository<T>` provides CRUD operations. Entity-specific repositories extend it for custom queries (filtering, sorting, pagination). All methods accept a `CancellationToken` that flows from the controller down to EF Core.
-
-### Auditing
-
-`AuditableEntity` base class with `CreatedAt`, `ModifiedAt`, `CreatedBy`, `ModifiedBy` fields. An EF Core `SaveChangesInterceptor` populates these automatically using the authenticated user from `ICurrentUserService`.
+- Expected business failures (not found, a broken business rule, a validation problem) travel up
+  as a `Result` from the service layer. The controller turns a failed result into the right status
+  code.
+- Anything unexpected throws, and `ExceptionHandlingMiddleware` catches it, logs it with the
+  correlation id, and returns a 500-class response. It also checks `Response.HasStarted` first: if
+  the response has already begun streaming there's no way to write a clean error body, so it
+  rethrows instead of masking the original exception.
 
 ### Validation
 
-FluentValidation validators are registered in DI and executed via a custom `ValidationFilter`. Validation errors return structured responses with error codes.
+Validators live in the Application layer and are registered from the assembly. A custom
+`ValidationFilter` runs them before the action executes, so controllers never see invalid input.
+Failures come back with field-level messages and error codes.
 
-### Error Handling
+### Auditing
 
-Two complementary patterns:
-- **Result pattern** (FluentResults) for expected business failures
-- **Exceptions** for unexpected errors, caught by the exception middleware
+`AuditableEntity` carries `CreatedAt`, `ModifiedAt`, `CreatedBy`, and `ModifiedBy`. An EF Core
+`SaveChangesInterceptor` fills them in on every save, reading the current user from
+`ICurrentUserService`. You don't set these by hand.
 
-### Authentication
+### Repositories
 
-JWT Bearer authentication is configured from the `Jwt` section in `appsettings.json`. Endpoints that mutate data (`POST`, `PUT`, `PATCH`, `DELETE` on `CarsController`) are protected with `[Authorize]`; read endpoints are public. Swagger includes an "Authorize" button to send a Bearer token.
+`Repository<T>` covers the usual CRUD. Entity-specific repositories inherit from it and add their
+own queries (the sample `CarRepository` does filtering, sorting, and pagination). Every method
+takes a `CancellationToken`, and it's threaded all the way from the controller down to EF Core, so
+a cancelled request actually stops work instead of running to completion.
 
-The `Jwt:SigningKey` is a **secret** and is intentionally empty in `appsettings.json`. A throwaway dev key lives in `appsettings.Development.json` so the template runs out of the box. The app **fails fast on startup** outside the Testing environment if the key is missing or shorter than 32 bytes — supply a real one via environment variable, user-secrets, or a secret manager:
+## Authentication
+
+JWT bearer auth is configured from the `Jwt` section. The mutating endpoints on `CarsController`
+(`POST`, `PUT`, `PATCH`, `DELETE`) require `[Authorize]`; the read endpoints are open. Swagger has
+an Authorize button so you can paste a token and try the protected routes.
+
+The signing key is a secret, so it's left empty in `appsettings.json`. A throwaway key sits in
+`appsettings.Development.json` to keep local runs frictionless. Outside the Testing environment the
+app refuses to start if the key is missing or shorter than 32 bytes (HS256 needs at least 256
+bits), which turns a vague runtime failure into a clear startup error. Supply a real key out of
+band:
 
 ```bash
-# user-secrets (recommended for local dev)
+# local development
 dotnet user-secrets set "Jwt:SigningKey" "<a-long-random-secret>" --project src/DotnetApiTemplate.API
 
-# or environment variable (note the double underscore)
+# or an environment variable (the double underscore maps to the config section separator)
 export Jwt__SigningKey="<a-long-random-secret>"
 ```
 
-Never commit a production signing key.
+Don't commit a real key.
 
-**Getting a token (demo):** `AuthController` exposes `POST /api/v1/auth/token` which issues a
-signed JWT for any username **without checking credentials** — it exists only so you can try the
-`[Authorize]` endpoints immediately. It is gated for safety:
+### The demo token endpoint
 
-- The route returns **404** unless the app runs in **Development** *and*
-  `Auth:EnableDemoTokenEndpoint` is `true` (the default in `appsettings.Development.json`; `false`
-  in `appsettings.json`).
-- The app **refuses to start** if the flag is enabled outside Development, so a misconfigured
-  production deploy fails loudly rather than exposing an auth bypass.
+`AuthController` exposes `POST /api/v1/auth/token`, which hands back a signed JWT for whatever
+username you send, with no password check. It exists so the protected endpoints are usable the
+minute you clone the repo, and nothing more.
 
-Replace it with a real identity flow (validate credentials, add roles/claims, issue refresh
-tokens) before production.
+It's fenced off so it can't follow you into production:
+
+- The route returns 404 unless the app is in development and `Auth:EnableDemoTokenEndpoint` is
+  `true`. That flag is on in `appsettings.Development.json` and off in `appsettings.json`.
+- If the flag is ever switched on outside development, the app throws at startup. A misconfigured
+  deploy crashes loudly instead of quietly shipping an auth bypass.
 
 ```bash
 curl -X POST https://localhost:7001/api/v1/auth/token \
   -H "Content-Type: application/json" -d '{"username":"demo"}'
 ```
 
-### Rate Limiting
+Before you ship anything real, replace this with an actual identity flow: verify credentials
+against a user store, attach roles and claims, and decide whether you need refresh tokens.
 
-A global fixed-window rate limiter (partitioned by client IP) is enabled via
-`Microsoft.AspNetCore.RateLimiting`. Defaults live under the `RateLimiting` config section
-(`PermitLimit`, `WindowSeconds`, `QueueLimit`); over-limit requests get `429 Too Many Requests`.
-Swap in per-endpoint policies as the API grows.
+## Rate limiting
 
-### CORS
+A single global limiter is registered through `Microsoft.AspNetCore.RateLimiting`. It's a
+fixed-window limiter partitioned by client IP, and over-limit requests get a 429. The numbers come
+from the `RateLimiting` section:
 
-Allowed origins are read from `Cors:AllowedOrigins` in configuration. If the list is empty (the default in `appsettings.json`), the policy falls back to `AllowAnyOrigin` for convenience -- set explicit origins in production.
+```jsonc
+"RateLimiting": {
+  "PermitLimit": 100,     // requests allowed per window, per IP
+  "WindowSeconds": 10,
+  "QueueLimit": 0         // 0 means reject immediately instead of queueing
+}
+```
 
-### API Versioning
+One thing to watch: the partition key is `RemoteIpAddress`. Behind a reverse proxy or ingress
+that's the proxy's address, so every client collapses into one bucket and you're rate limiting the
+whole world together. If you deploy behind a proxy, configure `ForwardedHeaders` so
+`RemoteIpAddress` reflects the real client. When you outgrow one global limit, swap in named
+per-endpoint policies.
 
-Supports URL segment, header (`x-api-version`), and media type versioning. Default is v1.0.
+## CORS
 
-### Health Checks
+Allowed origins come from `Cors:AllowedOrigins`. When the list is empty (the default in
+`appsettings.json`) the policy falls back to `AllowAnyOrigin`, which is convenient locally and
+wrong in production. Set explicit origins before you deploy. Development already lists
+`http://localhost:3000` and `http://localhost:5173` for a typical SPA dev server.
 
-Two endpoints, suitable for container orchestrators:
+## Health checks
 
-- `GET /health/live` — **liveness**: is the process up? No dependency checks, so a transient
-  database blip won't cause an orchestrator to kill an otherwise-healthy instance.
-- `GET /health/ready` — **readiness**: can it serve traffic? Includes the database connectivity
-  check (`AddDbContextCheck`, tagged `ready`).
+Two endpoints, split deliberately:
 
-The Docker `HEALTHCHECK` targets `/health/live`.
+- `GET /health/live` runs no checks. It answers as long as the process is up. This is what an
+  orchestrator should use for liveness, because if liveness checked the database a brief outage
+  would get your healthy pods killed and restarted for no reason.
+- `GET /health/ready` includes the database connectivity check (`AddDbContextCheck`, tagged
+  `ready`). Use it for readiness and load-balancer gating.
+
+The Docker `HEALTHCHECK` hits `/health/live`.
+
+## API versioning
+
+Versions can be supplied three ways: URL segment (`/api/v1/...`), a header (`x-api-version`), or a
+media type parameter. The default is `1.0` when nothing is specified. Swagger shows one document
+per discovered version.
+
+## Logging
+
+Serilog writes structured logs to the console in every environment, which is what you want in a
+container where the platform collects stdout. In development it adds a rolling file sink under
+`../logs/` keeping seven days. There's no file sink in production, partly because it's noise the
+log driver already handles and partly because the container runs as a non-root user that can't
+write there anyway.
 
 ## Configuration
 
-### Connection String
+### Connection string
 
-Development uses `appsettings.Development.json` pointing to the Docker PostgreSQL instance:
+Development (`appsettings.Development.json`) points at the Docker database on your host:
 
 ```
 Host=localhost;Port=54320;Database=DotnetApiTemplateDb;User ID=postgres;Password=root
 ```
 
-Production config in `appsettings.json` uses `Host=db;Port=5432` for Docker-to-Docker networking.
+The base `appsettings.json` uses `Host=db;Port=5432`, which is the service name on the compose
+network, for container-to-container access.
 
-### Environment Variables
+### Environment variables
 
-The `.env` file (copied from `.env.example`) configures the Docker PostgreSQL container:
-- `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
+`.env` (copied from `.env.example`) feeds the PostgreSQL container in `docker-compose.yml`:
+`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`. The compose file has sane defaults, so a
+missing `.env` won't stop the database from starting.
 
-These override the API connection string values at runtime:
-- `DB_USER` -- PostgreSQL username
-- `DB_PASSWORD` -- PostgreSQL password
+The API can override the connection string credentials at runtime with `DB_USER` and
+`DB_PASSWORD`, which is handy when the username and password come from a secret store rather than
+the connection string itself.
 
-`.env` is gitignored; commit only `.env.example`.
+`.env` is gitignored. Only `.env.example` is committed.
 
-### Logging
+### Dependencies and build settings
 
-Serilog logs to the **console** in all environments (structured, container-friendly). In
-**Development** an additional rolling **file** sink writes to `../logs/` (7 days retained).
-Production stays console-only so logs are collected by your platform's log driver.
+Package versions are pinned in one place, `Directory.Packages.props`, using Central Package
+Management. Individual project files list packages without version numbers. Shared build settings
+(nullable, implicit usings, .NET analyzers, warnings-as-errors) live in `Directory.Build.props`;
+the test projects import it and then relax warnings-as-errors so test tooling noise doesn't fail
+the build. Dependabot watches NuGet, the GitHub Actions, and the Docker base image.
 
-### Database migrations
+## Migrations
 
-Migrations apply on startup only when `Database:MigrateOnStartup` is `true` — enabled in
-`appsettings.Development.json`, disabled by default in `appsettings.json`. For production,
-prefer running migrations as a separate, controlled deploy step rather than on app boot
-(it avoids races across instances and keeps DDL rights out of the runtime user):
+In development they run on startup. In production, don't do that. Migrating from app startup races
+when more than one instance boots at once, forces the runtime database user to hold DDL
+permissions it otherwise shouldn't, and couples your boot time to schema changes. Run them as their
+own deploy step instead. `Database:MigrateOnStartup` is the switch, and it's `false` in
+`appsettings.json`.
+
+The plain command, if your deploy runner has the SDK:
 
 ```bash
 dotnet ef database update \
@@ -208,70 +278,104 @@ dotnet ef database update \
   --startup-project src/DotnetApiTemplate.API
 ```
 
-### Dependencies & versions
+A self-contained bundle is usually the better fit for a pipeline, because the runner doesn't need
+the SDK or the source, just the bundle and a connection string:
 
-Package versions are managed centrally in `Directory.Packages.props` (Central Package
-Management). Shared build settings — nullable, analyzers, warnings-as-errors — live in
-`Directory.Build.props`. Dependabot keeps NuGet, GitHub Actions, and the Docker base image
-up to date.
+```bash
+dotnet ef migrations bundle \
+  --project src/DotnetApiTemplate.Persistence \
+  --startup-project src/DotnetApiTemplate.API \
+  --self-contained -r linux-x64 -o efbundle
 
-## Adding a New Entity
+./efbundle --connection "Host=...;Database=...;Username=...;Password=..."
+```
 
-1. Create the entity in `Domain/Entities/` extending `AuditableEntity`
-2. Add a `DbSet` in `DotnetApiTemplateDbContext`
-3. Add an EF configuration in `Persistence/Configurations/`
-4. Create a repository interface in `Application/Interfaces/Repositories/`
-5. Implement the repository in `Persistence/Repositories/`
-6. Create DTOs in `Application/DTOs/` and validators in `Application/Validators/`
-7. Create a service interface and implementation in `Application/`
-8. Add a controller in `API/Controllers/`
-9. Register the new services in `ApplicationServicesExtensions.cs`
-10. Create a migration: `dotnet ef migrations add <Name> --project src/DotnetApiTemplate.Persistence --startup-project src/DotnetApiTemplate.API`
+If a DBA applies changes, hand them an idempotent SQL script that's safe to run more than once:
+
+```bash
+dotnet ef migrations script --idempotent \
+  --project src/DotnetApiTemplate.Persistence \
+  --startup-project src/DotnetApiTemplate.API \
+  -o migrate.sql
+```
+
+If you're running a single instance and accept the trade-offs, you can set
+`Database__MigrateOnStartup=true` and keep the startup behaviour. The template doesn't force the
+choice on you.
+
+## Adding an entity
+
+Using the bundled `Car` as the worked example:
+
+1. Add the entity under `Domain/Entities/`, inheriting `AuditableEntity`.
+2. Add a `DbSet<>` to `DotnetApiTemplateDbContext`.
+3. Add an EF configuration under `Persistence/Configurations/`.
+4. Declare a repository interface in `Application/Interfaces/Repositories/`.
+5. Implement it in `Persistence/Repositories/` (inherit `Repository<T>` for the CRUD).
+6. Add DTOs in `Application/DTOs/` and validators in `Application/Validators/`.
+7. Add a service interface and implementation in `Application/`.
+8. Add a controller in `API/Controllers/`.
+9. Register the new service and repository in `ApplicationServicesExtensions.cs`.
+10. Create the migration:
+
+```bash
+dotnet ef migrations add AddYourEntity \
+  --project src/DotnetApiTemplate.Persistence \
+  --startup-project src/DotnetApiTemplate.API
+```
 
 ## Docker
 
-### Development
+For local development you only need the database:
 
 ```bash
-docker compose up -d   # PostgreSQL on port 54320
+docker compose up -d        # PostgreSQL on localhost:54320
 ```
 
-### Deployment
-
-The Dockerfile produces a minimal Alpine-based image that **runs as a non-root user** and
-ships a `HEALTHCHECK` hitting `/health/live`:
+The Dockerfile builds the API into a small Alpine image, runs it as the non-root user that the
+.NET base image provides, and ships a healthcheck against `/health/live`:
 
 ```bash
 docker build -f src/DotnetApiTemplate.API/Dockerfile -t myapp .
+
 docker run -p 8080:8080 \
   -e Jwt__SigningKey="<a-long-random-secret>" \
   -e ConnectionStrings__DefaultConnection="Host=...;Database=...;Username=...;Password=..." \
   myapp
 ```
 
-Remember the app **fails fast** without a valid `Jwt__SigningKey`, and migrations don't run on
-boot unless `Database__MigrateOnStartup=true`.
+Two reminders the container will enforce for you: it won't start without a valid `Jwt__SigningKey`,
+and it won't migrate on boot unless you pass `Database__MigrateOnStartup=true`.
 
-## Testing
+## Tests
 
 ```bash
-# All tests
-dotnet test
-
-# Unit tests only
-dotnet test tests/DotnetApiTemplate.UnitTests
-
-# Integration tests only
-dotnet test tests/DotnetApiTemplate.IntegrationTests
+dotnet test                                          # everything
+dotnet test tests/DotnetApiTemplate.UnitTests        # unit only
+dotnet test tests/DotnetApiTemplate.IntegrationTests # integration only
 ```
 
-Integration tests use an in-memory database and `WebApplicationFactory` -- no external dependencies needed.
+Unit tests cover the service and validator logic with xUnit, FluentAssertions, and Moq.
+Integration tests spin up the API with `WebApplicationFactory` against an in-memory EF provider, so
+they need nothing external. Authentication is stubbed there with a test handler, and the rate
+limiter is given a huge permit limit so a growing suite never trips a 429.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs on pushes and pull requests to `main`, in two jobs:
+
+- Build and test in Release.
+- Install the template, scaffold a fresh project from it, and build that. This catches the case
+  where the app still compiles but the template itself is broken, which a normal build wouldn't
+  notice.
+
+`.github/workflows/codeql.yml` runs CodeQL on the same triggers plus a weekly schedule.
 
 ## Contributing
 
-Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md). For security issues, see
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues privately, as described in
 [SECURITY.md](SECURITY.md).
 
 ## License
 
-Licensed under the [MIT License](LICENSE).
+MIT. See [LICENSE](LICENSE).
