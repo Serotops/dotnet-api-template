@@ -16,14 +16,14 @@ public abstract class IntegrationTestBase : IClassFixture<ApiTestFactory>, IDisp
     protected readonly ApiTestFactory Factory;
     protected readonly HttpClient Client;
     protected readonly IServiceScope Scope;
-    protected readonly DotnetApiTemplateDbContext DbContext;
+    protected readonly AppDbContext DbContext;
 
     protected IntegrationTestBase(ApiTestFactory factory)
     {
         Factory = factory;
         Client = factory.CreateClient();
         Scope = factory.CreateScope();
-        DbContext = Scope.ServiceProvider.GetRequiredService<DotnetApiTemplateDbContext>();
+        DbContext = Scope.ServiceProvider.GetRequiredService<AppDbContext>();
     }
 
     /// <summary>

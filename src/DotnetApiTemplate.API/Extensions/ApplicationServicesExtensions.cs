@@ -142,7 +142,7 @@ public static class ApplicationServicesExtensions
 
         if (!environment.IsEnvironment("Testing"))
         {
-            services.AddDbContext<DotnetApiTemplateDbContext>((sp, options) =>
+            services.AddDbContext<AppDbContext>((sp, options) =>
             {
                 NpgsqlConnectionStringBuilder connectionString = new(
                     config.GetConnectionString("DefaultConnection")
@@ -171,7 +171,7 @@ public static class ApplicationServicesExtensions
         services.AddValidatorsFromAssemblyContaining<CarUpsertDtoValidator>();
 
         services.AddHealthChecks()
-            .AddDbContextCheck<DotnetApiTemplateDbContext>("database", tags: ["ready"]);
+            .AddDbContextCheck<AppDbContext>("database", tags: ["ready"]);
 
         var rateLimitSection = config.GetSection("RateLimiting");
         var permitLimit = rateLimitSection.GetValue("PermitLimit", 100);

@@ -80,7 +80,7 @@ var migrateOnStartup = app.Configuration.GetValue<bool>("Database:MigrateOnStart
 if (migrateOnStartup && !app.Environment.IsEnvironment("Testing"))
 {
     using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<DotnetApiTemplateDbContext>();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.SetCommandTimeout(300);
     await db.Database.MigrateAsync();
 }

@@ -44,6 +44,12 @@ jobs:
       - name: Scaffold a project from the template
         run: dotnet new dotnet-api -n Acme.Sample -o ../scaffold-test
 
+      # Restore and build are split: a combined `dotnet build` restores projects in
+      # parallel on a fresh tree and can hit a "file already exists" race in obj/.
+      - name: Restore the scaffolded project
+        working-directory: ../scaffold-test
+        run: dotnet restore
+
       - name: Build the scaffolded project
         working-directory: ../scaffold-test
-        run: dotnet build --configuration Release
+        run: dotnet build --no-restore --configuration Release

@@ -10,7 +10,7 @@ namespace DotnetApiTemplate.Persistence.Repositories;
 /// Car repository implementation.
 /// Inherits common CRUD operations from Repository and implements Car-specific methods.
 /// </summary>
-public class CarRepository(DotnetApiTemplateDbContext context)
+public class CarRepository(AppDbContext context)
     : Repository<Car>(context), ICarRepository
 {
     // GetByIdAsync, GetAllAsync, AddAsync, UpdateAsync, DeleteAsync are inherited from Repository<Car>

@@ -4,10 +4,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace DotnetApiTemplate.Persistence.Repositories;
 
-public class Repository<T>(DotnetApiTemplateDbContext context) : IRepository<T>
+public class Repository<T>(AppDbContext context) : IRepository<T>
     where T : Entity
 {
-    protected DotnetApiTemplateDbContext Context { get; } = context;
+    protected AppDbContext Context { get; } = context;
     protected DbSet<T> DbSet { get; } = context.Set<T>();
 
     /// <summary>

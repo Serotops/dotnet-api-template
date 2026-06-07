@@ -16,8 +16,11 @@
                   serialized API contract, not internal identifiers.
          CA1848 - LoggerMessage source-gen delegates add ceremony that hurts readability in a
                   template; structured logging via ILogger extension methods is fine here.
-         CA1000 - static factory methods on generic response types (ApiResponse<T>) are idiomatic. -->
-    <NoWarn>$(NoWarn);CA1707;CA1848;CA1000</NoWarn>
+         CA1000 - static factory methods on generic response types (ApiResponse<T>) are idiomatic.
+         CA1861 - fires on constant arrays inside EF-generated migration code. The .editorconfig
+                  exempts Migrations, but that suppression is honored inconsistently across build
+                  graphs, so it's disabled solution-wide to keep builds deterministic. -->
+    <NoWarn>$(NoWarn);CA1707;CA1848;CA1000;CA1861</NoWarn>
   </PropertyGroup>
 
 </Project>

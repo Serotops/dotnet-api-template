@@ -27,7 +27,7 @@ public class ApiTestFactory : WebApplicationFactory<Program>
         builder.ConfigureServices(services =>
         {
             var descriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<DotnetApiTemplateDbContext>));
+                d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
             if (descriptor != null)
                 services.Remove(descriptor);
 
@@ -36,7 +36,7 @@ public class ApiTestFactory : WebApplicationFactory<Program>
             if (optionsDescriptor != null)
                 services.Remove(optionsDescriptor);
 
-            services.AddDbContext<DotnetApiTemplateDbContext>((sp, options) =>
+            services.AddDbContext<AppDbContext>((sp, options) =>
             {
                 options.AddInterceptors(sp.GetRequiredService<AuditableEntitySaveChangesInterceptor>());
                 options.UseInMemoryDatabase(_databaseName);
@@ -58,7 +58,7 @@ public class ApiTestFactory : WebApplicationFactory<Program>
     public void ClearDatabase()
     {
         using var scope = CreateScope();
-        var context = scope.ServiceProvider.GetRequiredService<DotnetApiTemplateDbContext>();
+        var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         context.Cars.RemoveRange(context.Cars);
         context.SaveChanges();
     }

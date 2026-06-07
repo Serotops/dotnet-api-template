@@ -54,6 +54,9 @@ csharp_space_after_keywords_in_control_flow_statements = true
 dotnet_code_quality_unused_parameters = all:suggestion
 csharp_style_unused_value_assignment_preference = discard_variable:suggestion
 
-# EF Core migrations are tool-generated; don't subject them to analyzers
+# EF Core migrations are tool-generated; don't subject them to analyzers.
+# generated_code alone is honored inconsistently across build graphs, so also turn
+# analyzer diagnostics off outright for this folder.
 [**/Migrations/*.cs]
 generated_code = true
+dotnet_analyzer_diagnostic.severity = none
