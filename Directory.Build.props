@@ -6,21 +6,25 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>
 
-    <!-- Quality bar inherited by every project in the solution -->
+    <!-- Quality bar inherited by every project in the solution.
+         Compiler warnings (CSxxxx) are errors: they flag real correctness issues and are
+         stable across SDK versions. Analyzer warnings (CAxxxx) are NOT promoted to errors,
+         because the recommended rule set grows with each SDK feature band: a newer SDK on
+         CI or a contributor's machine would otherwise fail a build that's clean locally.
+         They still surface as warnings, just don't break the build. -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <CodeAnalysisTreatWarningsAsErrors>false</CodeAnalysisTreatWarningsAsErrors>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
 
-    <!-- Suppressed analyzer rules, with rationale:
+    <!-- Analyzer rules silenced to keep build output clean, with rationale:
          CA1707 - ErrorCode enum members use SCREAMING_SNAKE_CASE intentionally; they are a
                   serialized API contract, not internal identifiers.
-         CA1848 - LoggerMessage source-gen delegates add ceremony that hurts readability in a
-                  template; structured logging via ILogger extension methods is fine here.
+         CA1848/CA1873 - LoggerMessage delegates / IsEnabled guards add ceremony that hurts
+                  readability in a template; plain structured logging via ILogger is fine here.
          CA1000 - static factory methods on generic response types (ApiResponse<T>) are idiomatic.
-         CA1861 - fires on constant arrays inside EF-generated migration code. The .editorconfig
-                  exempts Migrations, but that suppression is honored inconsistently across build
-                  graphs, so it's disabled solution-wide to keep builds deterministic. -->
-    <NoWarn>$(NoWarn);CA1707;CA1848;CA1000;CA1861</NoWarn>
+         CA1861 - fires on constant arrays inside EF-generated migration code. -->
+    <NoWarn>$(NoWarn);CA1707;CA1848;CA1873;CA1000;CA1861</NoWarn>
   </PropertyGroup>
 
 </Project>
