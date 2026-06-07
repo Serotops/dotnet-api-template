@@ -308,7 +308,7 @@ choice on you.
 Using the bundled `Car` as the worked example:
 
 1. Add the entity under `Domain/Entities/`, inheriting `AuditableEntity`.
-2. Add a `DbSet<>` to `DotnetApiTemplateDbContext`.
+2. Add a `DbSet<>` to `AppDbContext`.
 3. Add an EF configuration under `Persistence/Configurations/`.
 4. Declare a repository interface in `Application/Interfaces/Repositories/`.
 5. Implement it in `Persistence/Repositories/` (inherit `Repository<T>` for the CRUD).

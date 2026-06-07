@@ -20,6 +20,31 @@
   "guids": [
     "d9f8b8f1-8c1a-4d5e-9f8b-8f18c1a4d5e9"
   ],
+  "symbols": {
+    "dbNameBase": {
+      "type": "derived",
+      "valueSource": "name",
+      "valueTransform": "alphanumericOnly"
+    },
+    "dbName": {
+      "type": "derived",
+      "valueSource": "dbNameBase",
+      "valueTransform": "appendDb",
+      "replaces": "DotnetApiTemplateDb"
+    }
+  },
+  "forms": {
+    "alphanumericOnly": {
+      "identifier": "replace",
+      "pattern": "[^A-Za-z0-9]",
+      "replacement": ""
+    },
+    "appendDb": {
+      "identifier": "replace",
+      "pattern": "$",
+      "replacement": "Db"
+    }
+  },
   "sources": [
     {
       "modifiers": [
