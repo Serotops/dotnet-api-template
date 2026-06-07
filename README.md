@@ -58,9 +58,12 @@ dotnet run --project src/DotnetApiTemplate.API
 The API listens on `https://localhost:7001` and `http://localhost:5001` (see
 `Properties/launchSettings.json`). Swagger UI is at `/api`, and only in development.
 
-In development the database schema is created for you on startup, because
-`Database:MigrateOnStartup` is `true` in `appsettings.Development.json`. Production is a different
-story, covered under [Migrations](#migrations).
+The data layer is **code-first**: the schema is defined by the C# model (entities +
+`AppDbContext`) and applied through EF Core migrations, never hand-written SQL. In development you
+don't set anything up by hand — `docker compose up -d` creates the PostgreSQL database, and on
+`dotnet run` the pending migrations are applied automatically (`Database:MigrateOnStartup` is
+`true` in `appsettings.Development.json`), so the tables exist on first run. Production is a
+different story, covered under [Migrations](#migrations).
 
 ## Using it as a template
 
@@ -263,6 +266,10 @@ the test projects import it and then relax warnings-as-errors so test tooling no
 the build. Dependabot watches NuGet, the GitHub Actions, and the Docker base image.
 
 ## Migrations
+
+This is a code-first project: the schema comes from the EF Core model and is versioned as
+migrations under `Persistence/Migrations`. An initial migration is included, so a fresh clone
+has a working schema out of the box.
 
 In development they run on startup. In production, don't do that. Migrating from app startup races
 when more than one instance boots at once, forces the runtime database user to hold DDL
