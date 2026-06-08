@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using Serilog.Exceptions;
+using System.Diagnostics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -57,6 +58,28 @@ if (app.Environment.IsDevelopment())
         options.RoutePrefix = "api";
         options.InjectStylesheet("/api/swagger-custom/swagger-custom-style.css");
     });
+
+    // Open Swagger in the default browser on startup. launchSettings.json's
+    // launchBrowser is only honored by IDEs and `dotnet watch`, so do it here
+    // to also cover plain `dotnet run`. Opt out with OpenBrowserOnStartup=false.
+    if (app.Configuration.GetValue("OpenBrowserOnStartup", true))
+    {
+        app.Lifetime.ApplicationStarted.Register(() =>
+        {
+            try
+            {
+                // Bound addresses are only populated once the server has started.
+                var baseUrl = app.Urls.FirstOrDefault(u => u.StartsWith("https", StringComparison.OrdinalIgnoreCase))
+                    ?? app.Urls.FirstOrDefault()
+                    ?? "https://localhost:7001";
+                Process.Start(new ProcessStartInfo($"{baseUrl}/api") { UseShellExecute = true });
+            }
+            catch
+            {
+                // Best-effort only (e.g. headless/CI environments). Never fail startup.
+            }
+        });
+    }
 }
 
 app.UseAuthentication();
